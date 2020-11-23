@@ -1,30 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using Crestron.SimplSharp;
 using PepperDash.Core;
 using PepperDash.Essentials.Core;
 using PepperDash.Essentials.Core.Bridges;
 
 namespace AxisCameraEpi
 {
-    public class AxisCamera : EssentialsDevice, IBridgeAdvanced, ICommunicationMonitor
+    public class AxisCamera : EssentialsDevice, IBridgeAdvanced, ICommunicationMonitor, IHasFeedback, IOnline, IPower
     {
-        private StatusMonitorBase _monitor;
-        private GenericHttpClient _client;
-        private IEnumerable<AxisCameraPreset> _presets;
-
-        public Dictionary<uint, StringFeedback> PresetNamesFeedbacks { get; private set; }
-        public IntFeedback NumberOfPresetsFeedback { get; private set; }
-        public StringFeedback NameFeedback { get; private set; }
-        public IntFeedback PanSpeedFeedback { get; private set; }
-        public IntFeedback ZoomSpeedFeedback { get; private set; }
-        public IntFeedback TiltSpeedFeedback { get; private set; }
-
-        public GenericHttpClient Client { get { return _client; } }
-        public StatusMonitorBase CommunicationMonitor { get { return _monitor; } }
-        public IEnumerable<AxisCameraPreset> Presets { get { return _presets; } }
+        private readonly GenericHttpClient _client;
+        private readonly IEnumerable<AxisCameraPreset> _presets;
 
         private int _panSpeed;
         private int _tiltSpeed;
@@ -44,51 +30,21 @@ namespace AxisCameraEpi
             AddPostActivationAction(() => CommunicationMonitor.Start());
         }
 
-        private void CheckComsAndSubscribe()
+        public GenericHttpClient Client
         {
-            _client.ResponseRecived += HandleResponseReceived;
+            get { return _client; }
         }
 
-        private void BuildCommunicationMonitor(IAxisCameraBuilderWithClient builder)
+        public StatusMonitorBase CommunicationMonitor { get; private set; }
+        public FeedbackCollection<Feedback> Feedbacks { get; private set; }
+
+        public BoolFeedback IsOnline
         {
-            _monitor = new AxisCameraMonitor(this, builder.Client, builder.MonitorConfig);
+            get { return CommunicationMonitor.IsOnlineFeedback; }
         }
 
-        private void SetupFeedbacks()
-        {
-            NameFeedback = new StringFeedback(() => Name);
-            NameFeedback.FireUpdate();
-
-            NumberOfPresetsFeedback = new IntFeedback(() => Presets.Count());
-            NumberOfPresetsFeedback.FireUpdate();
-
-            PanSpeedFeedback = new IntFeedback(() => PanSpeed);
-            TiltSpeedFeedback = new IntFeedback(() => TiltSpeed);
-            ZoomSpeedFeedback = new IntFeedback(() => ZoomSpeed);
-
-            PanSpeedFeedback.FireUpdate();
-            TiltSpeedFeedback.FireUpdate();
-            ZoomSpeedFeedback.FireUpdate();
-
-            PresetNamesFeedbacks = Presets.ToDictionary(x => (uint)x.Id, x => new StringFeedback(() => x.Name));
-
-            foreach (var feedback in PresetNamesFeedbacks)
-            {
-                feedback.Value.FireUpdate();
-            }
-        }
-        
-        private void SetDefaultValues()
-        {
-            _panSpeed = 50;
-            _tiltSpeed = 50;
-            _zoomSpeed = 50;
-        }
-
-        private void HandleResponseReceived(object sender, GenericHttpClientEventArgs e)
-        {
-            throw new NotImplementedException();
-        }
+        public StringFeedback NameFeedback { get; private set; }
+        public IntFeedback NumberOfPresetsFeedback { get; private set; }
 
         public int PanSpeed
         {
@@ -103,17 +59,18 @@ namespace AxisCameraEpi
             }
         }
 
-        public int ZoomSpeed
-        {
-            get { return _zoomSpeed; }
-            set
-            {
-                if (value > 100 || value < 0)
-                    return;
+        public IntFeedback PanSpeedFeedback { get; private set; }
 
-                _zoomSpeed = value;
-                ZoomSpeedFeedback.FireUpdate();
-            }
+        public BoolFeedback PowerIsOnFeedback
+        {
+            get { return IsOnline; }
+        }
+
+        public Dictionary<uint, StringFeedback> PresetNamesFeedbacks { get; private set; }
+
+        public IEnumerable<AxisCameraPreset> Presets
+        {
+            get { return _presets; }
         }
 
         public int TiltSpeed
@@ -129,9 +86,25 @@ namespace AxisCameraEpi
             }
         }
 
-        #region IBridgeAdvanced Members
+        public IntFeedback TiltSpeedFeedback { get; private set; }
 
-        public void LinkToApi(Crestron.SimplSharpPro.DeviceSupport.BasicTriList trilist, uint joinStart, string joinMapKey, EiscApiAdvanced bridge)
+        public int ZoomSpeed
+        {
+            get { return _zoomSpeed; }
+            set
+            {
+                if (value > 100 || value < 0)
+                    return;
+
+                _zoomSpeed = value;
+                ZoomSpeedFeedback.FireUpdate();
+            }
+        }
+
+        public IntFeedback ZoomSpeedFeedback { get; private set; }
+
+        public void LinkToApi(Crestron.SimplSharpPro.DeviceSupport.BasicTriList trilist, uint joinStart,
+                              string joinMapKey, EiscApiAdvanced bridge)
         {
             var joinMap = new AxisCameraJoinMap(joinStart);
 
@@ -142,122 +115,127 @@ namespace AxisCameraEpi
             TiltSpeedFeedback.LinkInputSig(trilist.UShortInput[joinMap.TiltSpeed]);
             ZoomSpeedFeedback.LinkInputSig(trilist.UShortInput[joinMap.ZoomSpeed]);
 
-            trilist.SetStringSigAction(joinMap.DeviceComs, command => 
-                {
+            trilist.SetStringSigAction(joinMap.DeviceComs,
+                command =>
                     AxisCameraCommandBuilder
                         .SetDevice(this)
                         .SetCustomCommand(command)
-                        .Dispatch();
-                });
+                        .Dispatch());
 
-            trilist.SetBoolSigAction(joinMap.PanLeft, sig =>
-            {
-                if (sig) 
-                {
-                    AxisCameraCommandBuilder
-                        .SetDevice(this)
-                        .PanLeft()
-                        .Dispatch();
-                }
-                else 
-                {
-                    AxisCameraCommandBuilder
-                        .SetDevice(this)
-                        .PanTiltStop()
-                        .Dispatch();
-                }
-            });
+            trilist.SetBoolSigAction(joinMap.PanLeft,
+                sig =>
+                    {
+                        if (sig)
+                        {
+                            AxisCameraCommandBuilder
+                                .SetDevice(this)
+                                .PanLeft()
+                                .Dispatch();
+                        }
+                        else
+                        {
+                            AxisCameraCommandBuilder
+                                .SetDevice(this)
+                                .PanTiltStop()
+                                .Dispatch();
+                        }
+                    });
 
-            trilist.SetBoolSigAction(joinMap.PanRight, sig =>
-            {
-                if (sig) 
-                {
-                    AxisCameraCommandBuilder
-                        .SetDevice(this)
-                        .PanRight()
-                        .Dispatch();
-                }
-                else 
-                {
-                    AxisCameraCommandBuilder
-                        .SetDevice(this)
-                        .PanTiltStop()
-                        .Dispatch();
-                }
-            });
+            trilist.SetBoolSigAction(joinMap.PanRight,
+                sig =>
+                    {
+                        if (sig)
+                        {
+                            AxisCameraCommandBuilder
+                                .SetDevice(this)
+                                .PanRight()
+                                .Dispatch();
+                        }
+                        else
+                        {
+                            AxisCameraCommandBuilder
+                                .SetDevice(this)
+                                .PanTiltStop()
+                                .Dispatch();
+                        }
+                    });
 
 
-            trilist.SetBoolSigAction(joinMap.TiltUp, sig =>
-            {
-                if (sig) 
-                {
-                    AxisCameraCommandBuilder
-                        .SetDevice(this)
-                        .TiltUp()
-                        .Dispatch();
-                }
-                else 
-                {
-                    AxisCameraCommandBuilder
-                        .SetDevice(this)
-                        .PanTiltStop()
-                        .Dispatch();
-                }
-            });
+            trilist.SetBoolSigAction(joinMap.TiltUp,
+                sig =>
+                    {
+                        if (sig)
+                        {
+                            AxisCameraCommandBuilder
+                                .SetDevice(this)
+                                .TiltUp()
+                                .Dispatch();
+                        }
+                        else
+                        {
+                            AxisCameraCommandBuilder
+                                .SetDevice(this)
+                                .PanTiltStop()
+                                .Dispatch();
+                        }
+                    });
 
-            trilist.SetBoolSigAction(joinMap.TiltDown, sig =>
-            {
-                if (sig)
-                {
-                    AxisCameraCommandBuilder
-                        .SetDevice(this)
-                        .TiltDown()
-                        .Dispatch();
-                }
-                else
-                {
-                    AxisCameraCommandBuilder
-                        .SetDevice(this)
-                        .PanTiltStop()
-                        .Dispatch();
-                }
-            });
+            trilist.SetBoolSigAction(joinMap.TiltDown,
+                sig =>
+                    {
+                        if (sig)
+                        {
+                            AxisCameraCommandBuilder
+                                .SetDevice(this)
+                                .TiltDown()
+                                .Dispatch();
+                        }
+                        else
+                        {
+                            AxisCameraCommandBuilder
+                                .SetDevice(this)
+                                .PanTiltStop()
+                                .Dispatch();
+                        }
+                    });
 
-            trilist.SetBoolSigAction(joinMap.ZoomIn, sig =>
-            {
-                if (sig)
-                {
-                    AxisCameraCommandBuilder
-                        .SetDevice(this)
-                        .ZoomIn()
-                        .Dispatch();
-                }
-                else
-                {
-                    AxisCameraCommandBuilder
-                        .SetDevice(this)
-                        .ZoomStop()
-                        .Dispatch();
-                }
-            });
+            trilist.SetBoolSigAction(joinMap.ZoomIn,
+                sig =>
+                    {
+                        if (sig)
+                        {
+                            AxisCameraCommandBuilder
+                                .SetDevice(this)
+                                .ZoomIn()
+                                .Dispatch();
+                        }
+                        else
+                        {
+                            AxisCameraCommandBuilder
+                                .SetDevice(this)
+                                .ZoomStop()
+                                .Dispatch();
+                        }
+                    });
 
-            trilist.SetBoolSigAction(joinMap.ZoomOut, sig =>
-            {
-                if (sig)
-                {
-                    AxisCameraCommandBuilder
-                        .SetDevice(this)
-                        .ZoomOut()
-                        .Dispatch();
-                }
-                else
-                {
-                    AxisCameraCommandBuilder
-                        .SetDevice(this)
-                        .ZoomStop()
-                        .Dispatch();
-                }
-            });
+            trilist.SetBoolSigAction(joinMap.ZoomOut,
+                sig =>
+                    {
+                        if (sig)
+                        {
+                            AxisCameraCommandBuilder
+                                .SetDevice(this)
+                                .ZoomOut()
+                                .Dispatch();
+                        }
+                        else
+                        {
+                            AxisCameraCommandBuilder
+                                .SetDevice(this)
+                                .ZoomStop()
+                                .Dispatch();
+                        }
+                    });
 
             trilist.SetUShortSigAction(joinMap.PanSpeed, panSpeed => PanSpeed = panSpeed);
             trilist.SetUShortSigAction(joinMap.ZoomSpeed, zoomSpeed => ZoomSpeed = zoomSpeed);
@@ -274,31 +252,95 @@ namespace AxisCameraEpi
                 var recallJoin = joinMap.PresetRecallStart + presetNumber - 1;
                 var saveJoin = joinMap.PresetSaveStart + presetNumber - 1;
 
-                trilist.SetSigTrueAction(recallJoin, () =>
-                    {
+                trilist.SetSigTrueAction(recallJoin,
+                    () =>
                         AxisCameraCommandBuilder
                             .SetDevice(this)
-                            .RecallPreset((int)recallJoin)
-                            .Dispatch();
-                    });
+                            .RecallPreset((int) recallJoin)
+                            .Dispatch());
 
-                trilist.SetSigHeldAction(recallJoin, 5000, () =>
-                    {
+                trilist.SetSigHeldAction(recallJoin,
+                    5000,
+                    () =>
                         AxisCameraCommandBuilder
                             .SetDevice(this)
-                            .SavePreset((int)recallJoin)
-                            .Dispatch();
-                    });
+                            .SavePreset((int) recallJoin)
+                            .Dispatch());
 
-                trilist.SetSigTrueAction(saveJoin, () => {
+                trilist.SetSigTrueAction(saveJoin,
+                    () =>
                         AxisCameraCommandBuilder
                             .SetDevice(this)
-                            .SavePreset((int)recallJoin)
-                            .Dispatch();
-                    });
-            }	
+                            .SavePreset((int) recallJoin)
+                            .Dispatch());
+            }
         }
 
-        #endregion
+        public void PowerOff()
+        {
+            throw new NotImplementedException();
+        }
+
+        public void PowerOn()
+        {
+            throw new NotImplementedException();
+        }
+
+        public void PowerToggle()
+        {
+            throw new NotImplementedException();
+        }
+
+        private static void HandleResponseReceived(object sender, GenericHttpClientEventArgs e)
+        {
+            var keyed = sender as IKeyed;
+            if (sender == null)
+                return;
+
+            Debug.Console(1, keyed, "Received HTTP response - '{0}'", e.ResponseText);
+        }
+
+        private void BuildCommunicationMonitor(IAxisCameraBuilderWithClient builder)
+        {
+            CommunicationMonitor = new AxisCameraMonitor(this, builder.Client, builder.MonitorConfig);
+        }
+
+        private void CheckComsAndSubscribe()
+        {
+            _client.ResponseRecived += HandleResponseReceived;
+        }
+
+        private void SetDefaultValues()
+        {
+            _panSpeed = 50;
+            _tiltSpeed = 50;
+            _zoomSpeed = 50;
+        }
+
+        private void SetupFeedbacks()
+        {
+            Feedbacks = new FeedbackCollection<Feedback>();
+            NameFeedback = new StringFeedback("Name", () => Name);
+            NumberOfPresetsFeedback = new IntFeedback("NumberOfPresets", () => Presets.Count());
+            PanSpeedFeedback = new IntFeedback("PanSpeed", () => PanSpeed);
+            TiltSpeedFeedback = new IntFeedback("TiltSpeed", () => TiltSpeed);
+            ZoomSpeedFeedback = new IntFeedback("ZoomSpeed", () => ZoomSpeed);
+
+            PresetNamesFeedbacks = Presets
+                .ToDictionary(
+                    x => (uint) x.Id,
+                    x => new StringFeedback("Preset-" + x + "-Name", () => x.Name));
+
+            Feedbacks.AddRange(new Feedback[]
+                {
+                    NameFeedback,
+                    NumberOfPresetsFeedback,
+                    PanSpeedFeedback,
+                    TiltSpeedFeedback,
+                    ZoomSpeedFeedback
+                });
+
+            Feedbacks.AddRange(PresetNamesFeedbacks.Values.Cast<Feedback>());
+        }
     }
 }

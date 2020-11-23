@@ -1,10 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using Crestron.SimplSharp;
 using PepperDash.Core;
-using PepperDash.Essentials.Core;
 
 namespace AxisCameraEpi
 {
@@ -31,16 +27,15 @@ namespace AxisCameraEpi
 
     public class AxisCameraCommandBuilder : IAxisCommandBuilder, IAxisCommandDispatcher
     {
-        private static readonly string Cmd = "axis-cgi/com/ptz.cgi?";
-        private static readonly string PanTiltCmd = "continuouspantiltmove=";
-        private static readonly string ZoomCmd = "continuouszoommove=";
-        private static readonly string PresetCmd = "gotoserverpresetno=";
-        private static readonly string PollCmd = "info=1";
-        private static readonly string RecallPresetCmd = "gotoserverpresetno=";
-        private static readonly string SavePresetCmd = String.Empty;
+        public const string Cmd = "axis-cgi/com/ptz.cgi?";
+        public const string PanTiltCmd = "continuouspantiltmove=";
+        public const string ZoomCmd = "continuouszoommove=";
+        public const string PollCmd = "info=1";
+        public const string RecallPresetCmd = "gotoserverpresetno=";
+        public const string SavePresetCmd = "";
 
         private readonly AxisCamera _camera;
-        private StringBuilder _command;
+        private readonly StringBuilder _command = new StringBuilder(Cmd);
 
         public static IAxisCommandBuilder SetDevice(AxisCamera camera)
         {
@@ -50,7 +45,6 @@ namespace AxisCameraEpi
         private AxisCameraCommandBuilder(AxisCamera camera)
         {
             _camera = camera;
-            _command = new StringBuilder(Cmd);
         }
 
         #region IAxisCommandBuilder Members
@@ -147,7 +141,14 @@ namespace AxisCameraEpi
 
         public void Dispatch()
         {
-            _camera.Client.SendText(_command.ToString());
+            try
+            {
+                _camera.Client.SendText(_command.ToString());
+            }
+            catch (Exception ex)
+            {
+                Debug.Console(1, _camera, "Error dispatching command : {0}", ex.Message);
+            }
         }
 
         #endregion

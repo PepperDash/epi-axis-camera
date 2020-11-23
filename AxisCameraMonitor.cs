@@ -13,17 +13,15 @@ namespace AxisCameraEpi
     public class AxisCameraMonitor : StatusMonitorBase
     {
         private readonly CTimer _timer;
-        private readonly GenericHttpClient _client;
         private readonly long _pollInterval;
 
         public AxisCameraMonitor(IKeyed parent, GenericHttpClient client, CommunicationMonitorConfig props)
             : base (parent, props.TimeToWarning, props.TimeToError)
         {
-            _client = client;
             _pollInterval = props.PollInterval;
 
             _timer = new CTimer(TimerCallback, props.PollString, Timeout.Infinite, _pollInterval);
-            _client.ResponseRecived += HandleResponseReceived;
+            client.ResponseRecived += HandleResponseReceived;
 
             CrestronEnvironment.ProgramStatusEventHandler += eventType =>
                 {
