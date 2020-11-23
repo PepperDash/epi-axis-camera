@@ -18,6 +18,10 @@
 mono_crash.*
 
 # Build results
+[Bb]in/
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]eleases/
 x64/
 x86/
 [Aa][Rr][Mm]/
@@ -123,6 +127,9 @@ _ReSharper*/
 *.[Rr]e[Ss]harper
 *.DotSettings.user
 
+# JustCode is a .NET coding add-in
+.JustCode
+
 # TeamCity is a build add-in
 _TeamCity*
 
@@ -132,9 +139,6 @@ _TeamCity*
 # AxoCover is a Code Coverage Tool
 .axoCover/*
 !.axoCover/settings.json
-
-# Coverlet is a free, cross platform Code Coverage Tool
-coverage*[.json, .xml, .info]
 
 # Visual Studio code coverage results
 *.coverage
@@ -347,3 +351,5 @@ MigrationBackup/
 
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
+*.projectinfo
+*.projectinfo~Stashed changes
