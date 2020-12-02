@@ -86,6 +86,7 @@
     <Compile Include="AxisCamera.cs" />
     <Compile Include="AxisCameraBuilder.cs" />
     <Compile Include="AxisCameraCommands.cs" />
+    <Compile Include="AxisCameraFactory.cs" />
     <Compile Include="AxisCameraJoinMap.cs" />
     <Compile Include="AxisCameraMonitor.cs" />
     <Compile Include="AxisCameraPreset.cs" />

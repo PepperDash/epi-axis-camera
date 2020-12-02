@@ -21,6 +21,9 @@ namespace AxisCameraEpi
             Presets = new List<AxisCameraPreset>();
         }
 
+        [JsonProperty("hostname")]
+        public string Hostname { get; set; }
+
         [JsonProperty("communicationMonitor")]
         public CommunicationMonitorConfig CommunicationMonitor { get; set; }
 
