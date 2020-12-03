@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Text;
+using Crestron.SimplSharp.Net.Http;
 using PepperDash.Core;
 
 namespace AxisCameraEpi
@@ -105,7 +106,7 @@ namespace AxisCameraEpi
         public IAxisCommandDispatcher ZoomStop()
         {
             _command.Append(ZoomCmd);
-            _command.Append("0,0");
+            _command.Append("0");
             return this;
         }
 
