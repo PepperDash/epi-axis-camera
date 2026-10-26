@@ -1,0 +1,158 @@
+{
+  "versions": {
+    "essentials": {
+      "version": "3.0.0-rc.17",
+      "repoUrl": "https://github.com/PepperDash/Essentials",
+      "packageId": "PepperDashEssentials"
+    },
+    "packages": [
+      {
+        "packageId": "epi-axis-camera",
+        "version": "REPLACE-WITH-RELEASE-VERSION",
+        "repoUrl": "https://github.com/PepperDash/epi-axis-camera"
+      }
+    ],
+    "userInterfaces": []
+  },
+  "system": {},
+  "system_url": "",
+  "template": {
+    "info": {
+      "comment": "Example: many cameras on one EISC, laid out by camera number (joinLayout indexed, joinStart 1 for every camera). Each camera gets its address, port and login from SIMPL on serial joins (connectionSource bridge), so none of it is repeated here. Digital joins are 30 per camera, preset save is analog join n, host is serial join n. The decoder streams are the cameras (cameraKey).",
+      "systemType": "huddle",
+      "processorType": "cp4n",
+      "lastUid": 7
+    },
+    "devices": [
+      {
+        "key": "processor",
+        "uid": 1,
+        "name": "CP4N",
+        "type": "cp4n",
+        "group": "processor",
+        "properties": {}
+      },
+      {
+        "key": "cam-01",
+        "uid": 2,
+        "name": "Camera 1",
+        "type": "axisCamera",
+        "group": "camera",
+        "properties": {
+          "connectionSource": "bridge",
+          "joinLayout": "indexed",
+          "cameraIndex": 1,
+          "presetMode": "server",
+          "presetCount": 8
+        }
+      },
+      {
+        "key": "cam-02",
+        "uid": 3,
+        "name": "Camera 2",
+        "type": "axisCamera",
+        "group": "camera",
+        "properties": {
+          "connectionSource": "bridge",
+          "joinLayout": "indexed",
+          "cameraIndex": 2,
+          "presetMode": "server",
+          "presetCount": 8
+        }
+      },
+      {
+        "key": "cam-03",
+        "uid": 4,
+        "name": "Camera 3",
+        "type": "axisCamera",
+        "group": "camera",
+        "properties": {
+          "connectionSource": "bridge",
+          "joinLayout": "indexed",
+          "cameraIndex": 3,
+          "presetMode": "server",
+          "presetCount": 8
+        }
+      },
+      {
+        "key": "d1110-1",
+        "uid": 5,
+        "name": "D1110 #1",
+        "type": "axisD1110",
+        "group": "decoder",
+        "properties": {
+          "host": "192.168.10.60",
+          "username": "root",
+          "password": "REPLACE",
+          "resolution": "1920x1080",
+          "streams": {
+            "1": {
+              "cameraKey": "cam-01"
+            },
+            "2": {
+              "cameraKey": "cam-02"
+            },
+            "3": {
+              "cameraKey": "cam-03"
+            }
+          }
+        }
+      },
+      {
+        "key": "eisc-cameras",
+        "uid": 6,
+        "name": "Cameras EISC",
+        "type": "eiscApiAdvanced",
+        "group": "api",
+        "properties": {
+          "control": {
+            "tcpSshProperties": {
+              "address": "127.0.0.2",
+              "port": 0
+            },
+            "ipid": "1F"
+          },
+          "devices": [
+            {
+              "deviceKey": "cam-01",
+              "joinStart": 1
+            },
+            {
+              "deviceKey": "cam-02",
+              "joinStart": 1
+            },
+            {
+              "deviceKey": "cam-03",
+              "joinStart": 1
+            }
+          ]
+        }
+      },
+      {
+        "key": "eisc-decoders",
+        "uid": 7,
+        "name": "Decoder EISC",
+        "type": "eiscApiAdvanced",
+        "group": "api",
+        "properties": {
+          "control": {
+            "tcpSshProperties": {
+              "address": "127.0.0.2",
+              "port": 0
+            },
+            "ipid": "F2"
+          },
+          "devices": [
+            {
+              "deviceKey": "d1110-1",
+              "joinStart": 1
+            }
+          ]
+        }
+      }
+    ],
+    "rooms": [],
+    "sourceLists": {},
+    "tieLines": []
+  }
+}

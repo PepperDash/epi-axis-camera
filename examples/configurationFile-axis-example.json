@@ -1,0 +1,176 @@
+{
+  "versions": {
+    "essentials": {
+      "version": "3.0.0-rc.17",
+      "repoUrl": "https://github.com/PepperDash/Essentials",
+      "packageId": "PepperDashEssentials"
+    },
+    "packages": [
+      {
+        "packageId": "epi-axis-camera",
+        "version": "REPLACE-WITH-RELEASE-VERSION",
+        "repoUrl": "https://github.com/PepperDash/epi-axis-camera"
+      }
+    ],
+    "userInterfaces": []
+  },
+  "system": {},
+  "system_url": "",
+  "template": {
+    "info": {
+      "comment": "Example: three Axis PTZ cameras (axisCamera) and two D1110 decoders (axisD1110) on one EISC. d1110-1 takes its streams from the cameras with cameraKey, so each camera address and login is written once. d1110-2 gets its stream URLs from SIMPL (streamSource bridge). Replace addresses, passwords and the plugin version.",
+      "systemType": "huddle",
+      "processorType": "cp4n",
+      "lastUid": 7
+    },
+    "devices": [
+      {
+        "key": "processor",
+        "uid": 1,
+        "name": "CP4N",
+        "type": "cp4n",
+        "group": "processor",
+        "properties": {}
+      },
+      {
+        "key": "cam-left",
+        "uid": 2,
+        "name": "Left PTZ",
+        "type": "axisCamera",
+        "group": "camera",
+        "properties": {
+          "host": "192.168.10.241",
+          "username": "admin",
+          "password": "REPLACE",
+          "presetMode": "server",
+          "presetCount": 8,
+          "presets": {
+            "1": "Home",
+            "2": "Podium"
+          }
+        }
+      },
+      {
+        "key": "cam-right",
+        "uid": 3,
+        "name": "Right PTZ",
+        "type": "axisCamera",
+        "group": "camera",
+        "properties": {
+          "host": "192.168.10.242",
+          "username": "admin",
+          "password": "REPLACE",
+          "presetMode": "server",
+          "presetCount": 8
+        }
+      },
+      {
+        "key": "cam-monopod",
+        "uid": 4,
+        "name": "Shared Monopod",
+        "type": "axisCamera",
+        "group": "camera",
+        "properties": {
+          "host": "192.168.10.240",
+          "username": "admin",
+          "password": "REPLACE",
+          "presetMode": "server",
+          "presetCount": 8
+        }
+      },
+      {
+        "key": "d1110-1",
+        "uid": 5,
+        "name": "D1110 #1",
+        "type": "axisD1110",
+        "group": "decoder",
+        "properties": {
+          "host": "192.168.10.60",
+          "username": "root",
+          "password": "REPLACE",
+          "authMode": "digest",
+          "resolution": "1920x1080",
+          "pollTimeMs": 30000,
+          "defaultStream": 0,
+          "streams": {
+            "1": {
+              "cameraKey": "cam-left"
+            },
+            "2": {
+              "cameraKey": "cam-right"
+            },
+            "3": {
+              "cameraKey": "cam-monopod"
+            }
+          }
+        }
+      },
+      {
+        "key": "d1110-2",
+        "uid": 6,
+        "name": "D1110 #2 (stream URLs from SIMPL)",
+        "type": "axisD1110",
+        "group": "decoder",
+        "properties": {
+          "host": "192.168.10.61",
+          "username": "root",
+          "password": "REPLACE",
+          "streamSource": "bridge",
+          "resolution": "1920x1080",
+          "streams": {
+            "1": {
+              "name": "Left PTZ"
+            },
+            "2": {
+              "name": "Right PTZ"
+            },
+            "3": {
+              "name": "Shared Monopod"
+            }
+          }
+        }
+      },
+      {
+        "key": "eisc-axis",
+        "uid": 7,
+        "name": "Axis EISC",
+        "type": "eiscApiAdvanced",
+        "group": "api",
+        "properties": {
+          "control": {
+            "tcpSshProperties": {
+              "address": "127.0.0.2",
+              "port": 0
+            },
+            "ipid": "F2"
+          },
+          "devices": [
+            {
+              "deviceKey": "cam-left",
+              "joinStart": 1
+            },
+            {
+              "deviceKey": "cam-right",
+              "joinStart": 51
+            },
+            {
+              "deviceKey": "cam-monopod",
+              "joinStart": 101
+            },
+            {
+              "deviceKey": "d1110-1",
+              "joinStart": 151
+            },
+            {
+              "deviceKey": "d1110-2",
+              "joinStart": 201
+            }
+          ]
+        }
+      }
+    ],
+    "rooms": [],
+    "sourceLists": {},
+    "tieLines": []
+  }
+}

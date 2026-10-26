@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <RootNamespace>PepperDash.Essentials.Plugins.Camera.Axis.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="FluentAssertions" Version="7.0.0" />
+    <!-- The plugin's Essentials reference excludes runtime assets. Referencing it here without the exclusion
+         copies the Essentials libraries (and Newtonsoft) to the test output. The config class carries the
+         ConfigSnippet attribute from Essentials, and Newtonsoft loads it when it reads the class. -->
+    <PackageReference Include="PepperDashEssentials" Version="3.0.0-rc.17" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The example configuration is tested, so it cannot drift from the plugin's config classes -->
+    <None Include="..\examples\*.json" Link="examples\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The tests only touch the decoder client and the config classes. Neither needs a Crestron or
+         Essentials runtime, so the plugin assembly loads and runs on the test host. -->
+    <ProjectReference Include="..\src\epi-axis-camera.4Series.csproj" />
+  </ItemGroup>
+</Project>
