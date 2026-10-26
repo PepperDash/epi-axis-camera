@@ -17,7 +17,7 @@ Controls Axis network devices from PepperDash Essentials over VAPIX. Two device 
 
 | Type | Device | What it does |
 |---|---|---|
-| `axisCamera` | Axis PTZ camera, written for the **M5526-E** | Pan, tilt, zoom, focus, iris, home, presets (recall and save), restart |
+| `axisCamera` | Axis PTZ camera, written for the **M5526-E** | Pan, tilt, zoom, focus, iris, home, presets (recall and save), restart, and privacy that hides the camera's video everywhere |
 | `axisD1110` | Axis D1110 video decoder | Tells the decoder which camera stream to show on its HDMI output |
 
 They work together. A decoder stream can be a camera (`"cameraKey": "cam-33"`), so each camera's address and login is written once and the decoder builds the RTSP URL from it.
@@ -65,6 +65,8 @@ Essentials code can also use the camera through the standard interfaces: `IHasCa
 * **Online**: the camera answered the last request.
 * **Autofocus** and **auto iris** state, read from the camera after a toggle and on every poll.
 * **Preset saved**: goes high for a second after a preset was saved.
+* **Privacy**: the state of the Privacy join, as feedback.
+* **Name and preview URL** for SIMPL (see the joins below). The preview URL is empty while privacy hides the camera's video.
 * **Last error**: the camera's error text, or a connection or HTTP failure. Empty when the last request worked.
 
 ### What it does not do
@@ -86,13 +88,17 @@ Privacy hides a camera's video everywhere, in addition to the camera moving to i
 * **The preview URL sent to SIMPL is cleared**, so touch panel previews of this camera stop.
 * **Every `axisD1110` decoder showing this camera is blanked.** The decoder remembers the stream it was asked to show, and shows it again when privacy ends. Selecting a stream whose camera is in privacy keeps the output blank until privacy ends.
 
-Moving the camera to its privacy position is not done here. Whatever recalls the preset (the main program's privacy logic recalls a preset through the preset joins) keeps doing it, so the join and the preset recall do not conflict and the order they arrive in does not matter. The camera's controls are not blocked by this plugin.
+Moving the camera to its privacy position is not done here. Whatever recalls the preset (for example a control program pressing the preset joins) keeps doing it, so the join and the preset recall do not conflict and the order they arrive in does not matter. The camera's controls are not blocked by this plugin.
 
-What this cannot do: anything that pulls the camera's RTSP stream directly (a recorder, for example) is not affected. Only the video this plugin sends and the decoders it controls are.
+What this cannot do:
+
+* **Streams it does not control.** Anything that pulls the camera's RTSP stream directly (a recorder, for example) is not affected. Only the video this plugin sends and the decoders it controls are.
+* **Linked devices.** Privacy is per camera device. If several `axisCamera` devices point at the same physical camera (for example one shared camera entered once per room), turning privacy on for one does not turn it on for the others, so the decoders showing the others keep showing it. Set privacy on each device that should hide.
+* **A decoder that does not blank.** A decoder is blanked by sending it an empty view configuration. That has not been confirmed on a real D1110, so check it before relying on it for privacy.
 
 ### How the camera answers
 
-VAPIX answers a PTZ command with `204 No Content` when it worked. A failed command is HTTP `200` with a body that starts with `Error:`. The plugin treats both the HTTP status and that body as the result. Saving a preset is documented under `ptzconfig.cgi` (administrator access). The old SIMPL camera program used `ptz.cgi`, which older firmware accepts, so the plugin tries `ptzconfig.cgi` first and falls back to `ptz.cgi`.
+VAPIX answers a PTZ command with `204 No Content` when it worked. A failed command is HTTP `200` with a body that starts with `Error:`. The plugin treats both the HTTP status and that body as the result. Saving a preset is documented under `ptzconfig.cgi` (administrator access). Older firmware accepts `ptz.cgi` for this instead, so the plugin tries `ptzconfig.cgi` first and falls back to `ptz.cgi`.
 
 ## Configuration
 
@@ -152,6 +158,7 @@ The D1110 Decoder API has one job: it tells the decoder which streams to decode 
 | Start on a stream | `defaultStream` in the config | Applied once, the first time the decoder comes online. 0 leaves the decoder as it is |
 | Check it is reachable | Online feedback, `Poll`, the Refresh digital join | A `getViewConfiguration` request every `pollTimeMs` |
 | Probe the decoder | `SendRequest` (DEVJSON) with any Decoder API method | For example `getCapabilities`. The answer is logged |
+| Hide a camera on privacy | Nothing to do: it follows the camera | A decoder showing a camera blanks when that camera goes into privacy and shows the stream again afterwards. Only streams that name a camera (`cameraKey`) do this. See [Privacy](#privacy) |
 
 ### What you get back
 
@@ -295,9 +302,9 @@ With `"joinLayout": "indexed"` and a `cameraIndex`, many cameras share one EISC 
 * **Serial from SIMPL** (only when `connectionSource` is `bridge`): address `n`, port `50 + n`, username `100 + n`, password `150 + n`.
 * **Serial to SIMPL:** camera name `n`, preview URL `50 + n`, last error `100 + n`. Serial joins to and from SIMPL are separate, so the numbers can repeat.
 
-Camera 3, for example: tilt up is digital 61, preset 1 recall is digital 77, the restart join is digital 86, preset save is analog 3, and the address is serial 3.
+Camera 3, for example: tilt up is digital 61, preset 1 recall is digital 77, the restart join is digital 86, privacy is digital 89, preset save is analog 3, and the address is serial 3.
 
-This is the layout the old SIMPL camera program used for its 41 cameras, so a SIMPL program that talked to it can talk to this plugin: give the EISC the same IPID and the PTZ, preset and feedback joins are where they were.
+The layout is regular: every camera's block is exactly 30 digital joins after the previous one. A SIMPL program has to wire camera `n` to those joins. If a program was laid out some other way (for example blocks that shift partway down the list), it has to be rewired to this one: cameras whose blocks are not where the plugin expects them would control the wrong joins.
 
 **Where the camera data lives.** Configure each camera once, in Essentials: address, login and name. SIMPL is sent only what it needs, the camera name and the preview URL. That removes the camera list (and the camera URLs and logins) from the SIMPL configuration files. `"connectionSource": "bridge"` still exists for systems that would rather keep the address and login in SIMPL, and is not needed for this layout.
 
@@ -354,6 +361,8 @@ Set the plugin log level to Debug to see every request and response (for example
 | `Stream N cannot be used: camera cam-x has no address yet` | The camera gets its address from SIMPL and it has not arrived |
 | `Stream N cannot be used: no URL has been received from the bridge` | `streamSource` is `bridge` and SIMPL has not sent a URL for that stream |
 | `Decoder configuration changed outside this plugin` | Someone used the decoder's own interface. Select a stream again |
+| A decoder is blank and nobody blanked it, or a camera's preview URL is empty although it has an address | The camera is in privacy. `PrintStatus` on the camera shows `privacy=True`. Turn the Privacy join off (or `SetPrivacy` with `false`) |
+| Privacy is on but a decoder still shows the camera | The decoder's stream does not name that camera (`cameraKey`), or a different `axisCamera` device points at the same physical camera. Privacy is per camera device |
 
 DEVJSON commands (`devjson:1 <json>`) that call a device directly:
 
@@ -364,6 +373,7 @@ DEVJSON commands (`devjson:1 <json>`) that call a device directly:
 {"deviceKey":"cam-left","methodName":"PresetStore","params":[2]}
 {"deviceKey":"cam-left","methodName":"ToggleFocusMode","params":[]}
 {"deviceKey":"cam-left","methodName":"Poll","params":[]}
+{"deviceKey":"cam-left","methodName":"SetPrivacy","params":[true]}
 {"deviceKey":"cam-left","methodName":"SendRequest","params":["/axis-cgi/com/ptz.cgi?info=1"]}
 {"deviceKey":"d1110-1","methodName":"PrintStatus","params":[]}
 {"deviceKey":"d1110-1","methodName":"SelectStream","params":[1]}
@@ -379,6 +389,7 @@ Unit tests (`tests/`) cover the VAPIX requests and answers, the join layouts, th
 ## How it works
 
 * **Camera:** continuous moves start when a join goes high and stop when it goes low. Requests are queued and sent one at a time in the order they were made, so a stop never overtakes the move it belongs to.
+* **Privacy:** a camera raises an event when privacy hides or shows its video. Every decoder that has a stream naming that camera listens for it, and re-selects its stream: the output is blanked while the camera is in privacy and connects again when it is not.
 * **Decoder:** the Decoder API has no "select input" command. Selecting a stream sends a complete view configuration (one full screen pane showing one stream), which replaces what the decoder was showing. The decoder keeps its configuration across a restart. Commands are queued, so a poll never overlaps a select.
 
 ## Upgrading from the 1.0.0-rc plugin
@@ -395,7 +406,7 @@ Version 3 is a rewrite and is not compatible with the 1.0.0-rc releases of this 
 * Which VAPIX PTZ commands the M5526-E accepts (iris and auto iris in particular), and whether saving presets works through `ptzconfig.cgi` on its firmware.
 * That the D1110 and the cameras accept the Decoder API in the way described here.
 * Digest versus Basic authentication on the firmware in use.
-* That blanking a decoder (stream 0, an empty view configuration) clears the HDMI output.
+* That blanking a decoder (stream 0, an empty view configuration) clears the HDMI output. Privacy relies on this for the D1110 path.
 * How long a switch takes and whether the HDMI signal drops while it happens.
 
 ## Dependencies
