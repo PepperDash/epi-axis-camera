@@ -10,7 +10,8 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 	///
 	/// Indexed layout, for one EISC shared by many cameras (camera n of the table below, n starting at 1):
 	/// digital joins are the contiguous ones plus 30 for each camera before this one, the preset save analog join is n,
-	/// and the serial joins are n (host), 50+n (port), 100+n (username), 150+n (password), 200+n (name), 250+n (last error).
+	/// and the serial joins are n (host from SIMPL), 50+n (port), 100+n (username), 150+n (password). Serial joins to SIMPL are
+	/// n (name), 50+n (preview URL) and 100+n (last error). Serial joins to SIMPL and from SIMPL are separate, so they can share numbers.
 	/// </remarks>
 	public class AxisCameraBridgeJoinMap : JoinMapBaseAdvanced
 	{
@@ -115,10 +116,13 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 		public JoinDataComplete Password = Serial(4, "Camera password. Used when connectionSource is bridge", eJoinCapabilities.FromSIMPL);
 
 		[JoinName("DeviceName")]
-		public JoinDataComplete DeviceName = Serial(5, "Device name", eJoinCapabilities.ToSIMPL);
+		public JoinDataComplete DeviceName = Serial(5, "Camera name (the device name)", eJoinCapabilities.ToSIMPL);
 
 		[JoinName("LastError")]
 		public JoinDataComplete LastError = Serial(6, "Last error from the camera", eJoinCapabilities.ToSIMPL);
+
+		[JoinName("PreviewUrl")]
+		public JoinDataComplete PreviewUrl = Serial(7, "RTSP URL for previews: rtsp://host + streamPath at previewResolution", eJoinCapabilities.ToSIMPL);
 
 		#endregion
 
@@ -163,8 +167,11 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 			Port.JoinNumber = 50 + index;
 			Username.JoinNumber = 100 + index;
 			Password.JoinNumber = 150 + index;
-			DeviceName.JoinNumber = 200 + index;
-			LastError.JoinNumber = 250 + index;
+
+			// the serial joins to SIMPL stay within 1 to 191, the most the main program's EISC reads
+			DeviceName.JoinNumber = index;
+			PreviewUrl.JoinNumber = 50 + index;
+			LastError.JoinNumber = 100 + index;
 		}
 
 		private static JoinDataComplete Digital(uint number, uint span, string description, eJoinCapabilities capabilities)

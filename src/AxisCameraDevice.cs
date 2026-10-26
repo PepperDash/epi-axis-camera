@@ -27,6 +27,11 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 		string Username { get; }
 
 		/// <summary>
+		/// Path of the camera's main stream, for example /axis-media/media.amp
+		/// </summary>
+		string StreamPath { get; }
+
+		/// <summary>
 		/// Camera password, or empty
 		/// </summary>
 		string Password { get; }
@@ -98,6 +103,27 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 		/// Last error from the camera, empty when the last request worked
 		/// </summary>
 		public StringFeedback LastErrorFeedback { get; private set; }
+
+		/// <summary>
+		/// RTSP URL of the camera for touch panel previews, empty until the camera has an address
+		/// </summary>
+		public StringFeedback PreviewUrlFeedback { get; private set; }
+
+		/// <summary>
+		/// The preview URL: rtsp://host + streamPath at previewResolution
+		/// </summary>
+		public string PreviewUrl
+		{
+			get { return AxisStreamUrl.ForCamera(Host, StreamPath, string.IsNullOrWhiteSpace(config.PreviewResolution) ? "800x450" : config.PreviewResolution); }
+		}
+
+		/// <summary>
+		/// Path of the camera's main stream
+		/// </summary>
+		public string StreamPath
+		{
+			get { return string.IsNullOrWhiteSpace(config.StreamPath) ? AxisStreamUrl.DefaultCameraPath : config.StreamPath.Trim(); }
+		}
 
 		/// <summary>
 		/// The presets offered. Names come from the presets property
@@ -179,6 +205,7 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 			AutoIrisFeedback = new BoolFeedback("autoIris", () => autoIris == true);
 			PresetStoredFeedback = new BoolFeedback("presetStored", () => presetStored);
 			LastErrorFeedback = new StringFeedback("lastError", () => lastError);
+			PreviewUrlFeedback = new StringFeedback("previewUrl", () => PreviewUrl);
 
 			RebuildClient();
 
@@ -296,6 +323,7 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 			this.LogInformation("Bridge sent the camera {what} {value}", what, what == "password" ? "(hidden)" : (value.Length == 0 ? "(empty)" : value));
 
 			RebuildClient();
+			PreviewUrlFeedback.FireUpdate();
 
 			if (CurrentClient() != null) Poll();
 		}
@@ -756,10 +784,10 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 			var connection = CurrentConnection();
 
 			this.LogInformation(
-				"Status: host={host}:{port} login={login} online={online} autoFocus={af} autoIris={ai} lastError={error}",
+				"Status: host={host}:{port} login={login} online={online} autoFocus={af} autoIris={ai} lastError={error} previewUrl={url}",
 				connection.IsUsable ? connection.Host : "(none)", connection.EffectivePort,
 				string.IsNullOrEmpty(connection.Username) ? "(none)" : connection.Username,
-				online, autoFocus, autoIris, lastError);
+				online, autoFocus, autoIris, lastError, PreviewUrl);
 		}
 
 		/// <summary>
@@ -875,6 +903,10 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 			AutoIrisFeedback.LinkInputSig(trilist.BooleanInput[joinMap.AutoIris.JoinNumber]);
 			PresetStoredFeedback.LinkInputSig(trilist.BooleanInput[joinMap.PresetStored.JoinNumber]);
 			LastErrorFeedback.LinkInputSig(trilist.StringInput[joinMap.LastError.JoinNumber]);
+			PreviewUrlFeedback.LinkInputSig(trilist.StringInput[joinMap.PreviewUrl.JoinNumber]);
+
+			this.LogInformation("Sending SIMPL the camera name on serial join {name} and the preview URL on serial join {url}",
+				joinMap.DeviceName.JoinNumber, joinMap.PreviewUrl.JoinNumber);
 
 			UpdateFeedbacks(trilist, joinMap);
 
@@ -903,6 +935,7 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 			AutoIrisFeedback.FireUpdate();
 			PresetStoredFeedback.FireUpdate();
 			LastErrorFeedback.FireUpdate();
+			PreviewUrlFeedback.FireUpdate();
 		}
 
 		#endregion

@@ -19,6 +19,9 @@ public class JoinMapTests
 		map.PresetSave.JoinNumber.Should().Be(1);
 		map.Host.JoinNumber.Should().Be(1);
 		map.Password.JoinNumber.Should().Be(4);
+		map.DeviceName.JoinNumber.Should().Be(5);
+		map.LastError.JoinNumber.Should().Be(6);
+		map.PreviewUrl.JoinNumber.Should().Be(7);
 
 		var shifted = new AxisCameraBridgeJoinMap(101);
 		shifted.Up.JoinNumber.Should().Be(101);
@@ -73,8 +76,36 @@ public class JoinMapTests
 		map.Port.JoinNumber.Should().Be((uint)(50 + camera));
 		map.Username.JoinNumber.Should().Be((uint)(100 + camera));
 		map.Password.JoinNumber.Should().Be((uint)(150 + camera));
-		map.DeviceName.JoinNumber.Should().Be((uint)(200 + camera));
-		map.LastError.JoinNumber.Should().Be((uint)(250 + camera));
+		map.DeviceName.JoinNumber.Should().Be((uint)camera);
+		map.PreviewUrl.JoinNumber.Should().Be((uint)(50 + camera));
+		map.LastError.JoinNumber.Should().Be((uint)(100 + camera));
+	}
+
+	[Fact]
+	public void Indexed_SerialJoinsToSimplStayWithinWhatTheMainProgramReads()
+	{
+		// the main program's EISC has 191 serial joins
+		var map = new AxisCameraBridgeJoinMap(1, 41);
+
+		map.DeviceName.JoinNumber.Should().BeLessThanOrEqualTo(191);
+		map.PreviewUrl.JoinNumber.Should().BeLessThanOrEqualTo(191);
+		map.LastError.JoinNumber.Should().BeLessThanOrEqualTo(191);
+	}
+
+	[Fact]
+	public void Indexed_ToSimplSerialJoinsDoNotOverlapAcrossAllFortyOneCameras()
+	{
+		var used = new HashSet<uint>();
+
+		for (var camera = 1; camera <= 41; camera++)
+		{
+			var map = new AxisCameraBridgeJoinMap(1, camera);
+
+			foreach (var join in new[] { map.DeviceName, map.PreviewUrl, map.LastError })
+			{
+				used.Add(join.JoinNumber).Should().BeTrue("camera {0} serial join {1} must not repeat", camera, join.JoinNumber);
+			}
+		}
 	}
 
 	[Fact]
@@ -118,6 +149,8 @@ public class JoinMapTests
 		map.PresetSave.JoinNumber.Should().Be(3, "Preset_Save is analog join 3 for camera 3");
 		map.Host.JoinNumber.Should().Be(3, "IPAddress$ is serial join 3");
 		map.Password.JoinNumber.Should().Be(153);
+		map.DeviceName.JoinNumber.Should().Be(3, "the camera name goes to the main program on serial join 3");
+		map.PreviewUrl.JoinNumber.Should().Be(53);
 	}
 
 	[Fact]

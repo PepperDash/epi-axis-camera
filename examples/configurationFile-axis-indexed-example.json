@@ -18,7 +18,7 @@
   "system_url": "",
   "template": {
     "info": {
-      "comment": "Example: many cameras on one EISC, laid out by camera number (joinLayout indexed, joinStart 1 for every camera). Each camera gets its address, port and login from SIMPL on serial joins (connectionSource bridge), so none of it is repeated here. Digital joins are 30 per camera, preset save is analog join n, host is serial join n. The decoder streams are the cameras (cameraKey).",
+      "comment": "Example: many cameras on one EISC, laid out by camera number (joinLayout indexed, joinStart 1 for every camera). The cameras are configured here, once: address, login and name. SIMPL is sent only what it needs: the camera name (serial join n) and a preview URL for the touch panels (serial join 50 + n). The decoder streams are the cameras (cameraKey), at their own resolution.",
       "systemType": "huddle",
       "processorType": "cp4n",
       "lastUid": 7
@@ -35,43 +35,52 @@
       {
         "key": "cam-01",
         "uid": 2,
-        "name": "Camera 1",
+        "name": "Left PTZ",
         "type": "axisCamera",
         "group": "camera",
         "properties": {
-          "connectionSource": "bridge",
+          "host": "192.168.10.241",
+          "username": "admin",
+          "password": "REPLACE",
           "joinLayout": "indexed",
           "cameraIndex": 1,
           "presetMode": "server",
-          "presetCount": 8
+          "presetCount": 8,
+          "previewResolution": "800x450"
         }
       },
       {
         "key": "cam-02",
         "uid": 3,
-        "name": "Camera 2",
+        "name": "Right PTZ",
         "type": "axisCamera",
         "group": "camera",
         "properties": {
-          "connectionSource": "bridge",
+          "host": "192.168.10.242",
+          "username": "admin",
+          "password": "REPLACE",
           "joinLayout": "indexed",
           "cameraIndex": 2,
           "presetMode": "server",
-          "presetCount": 8
+          "presetCount": 8,
+          "previewResolution": "800x450"
         }
       },
       {
         "key": "cam-03",
         "uid": 4,
-        "name": "Camera 3",
+        "name": "Shared Monopod",
         "type": "axisCamera",
         "group": "camera",
         "properties": {
-          "connectionSource": "bridge",
+          "host": "192.168.10.240",
+          "username": "admin",
+          "password": "REPLACE",
           "joinLayout": "indexed",
           "cameraIndex": 3,
           "presetMode": "server",
-          "presetCount": 8
+          "presetCount": 8,
+          "previewResolution": "800x450"
         }
       },
       {
@@ -110,7 +119,7 @@
               "address": "127.0.0.2",
               "port": 0
             },
-            "ipid": "1F"
+            "ipid": "31"
           },
           "devices": [
             {

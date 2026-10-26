@@ -109,6 +109,31 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 		}
 
 		/// <summary>
+		/// The default path of an Axis camera's main stream
+		/// </summary>
+		public const string DefaultCameraPath = "/axis-media/media.amp";
+
+		/// <summary>
+		/// Builds the RTSP URL of a camera stream: rtsp://host + path, with the resolution set when one is given.
+		/// Returns an empty string when there is no host yet
+		/// </summary>
+		/// <param name="host">Camera address</param>
+		/// <param name="path">Stream path. Empty uses the Axis default</param>
+		/// <param name="resolution">For example 800x450. Empty leaves the URL without one</param>
+		public static string ForCamera(string host, string path, string resolution)
+		{
+			if (string.IsNullOrWhiteSpace(host)) return string.Empty;
+
+			path = string.IsNullOrWhiteSpace(path) ? DefaultCameraPath : path.Trim();
+			if (!path.StartsWith("/", StringComparison.Ordinal)) path = "/" + path;
+
+			AxisStreamUrl url;
+			if (!TryParse("rtsp://" + host.Trim() + path, out url)) return string.Empty;
+
+			return url.WithResolution(resolution).ToUrl();
+		}
+
+		/// <summary>
 		/// Returns a copy with the resolution query parameter set. Replaces the value if the URL already has
 		/// one, otherwise adds it. An empty resolution returns this URL unchanged.
 		/// </summary>
@@ -235,8 +260,9 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 					return false;
 				}
 
-				var path = string.IsNullOrWhiteSpace(config.CameraStreamPath) ? "/axis-media/media.amp" : config.CameraStreamPath.Trim();
-				source = "rtsp://" + camera.Host.Trim() + (path.StartsWith("/") ? path : "/" + path);
+				// the decoder's own cameraStreamPath wins, then the camera's streamPath, then the Axis default
+				var path = !string.IsNullOrWhiteSpace(config.CameraStreamPath) ? config.CameraStreamPath : camera.StreamPath;
+				source = AxisStreamUrl.ForCamera(camera.Host, path, null);
 			}
 			else
 			{

@@ -22,7 +22,9 @@ public class CameraConfigTests
 			""pollTimeMs"": 15000,
 			""connectionSource"": ""bridge"",
 			""joinLayout"": ""indexed"",
-			""cameraIndex"": 7
+			""cameraIndex"": 7,
+			""streamPath"": ""/camera/main"",
+			""previewResolution"": ""640x360""
 		}";
 
 		var config = JsonConvert.DeserializeObject<AxisCameraConfig>(json);
@@ -44,6 +46,8 @@ public class CameraConfigTests
 		config.IsBridgeSource.Should().BeTrue();
 		config.IsIndexedLayout.Should().BeTrue();
 		config.CameraIndex.Should().Be(7);
+		config.StreamPath.Should().Be("/camera/main");
+		config.PreviewResolution.Should().Be("640x360");
 	}
 
 	[Fact]
@@ -57,6 +61,8 @@ public class CameraConfigTests
 		config.PresetCount.Should().Be(0, "0 means the default of 8");
 		config.PanSpeed.Should().Be(0, "0 means the default");
 		config.Presets.Should().NotBeNull().And.BeEmpty();
+		config.StreamPath.Should().BeNull("an unset streamPath means /axis-media/media.amp");
+		config.PreviewResolution.Should().BeNull("an unset previewResolution means 800x450");
 	}
 
 	[Theory]

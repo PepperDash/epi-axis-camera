@@ -131,6 +131,20 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 		public Dictionary<string, string> Presets { get; set; }
 
 		/// <summary>
+		/// Path of the camera's main stream. Default /axis-media/media.amp. Used for the preview URL sent to SIMPL
+		/// and for decoder streams that name this camera
+		/// </summary>
+		[JsonProperty("streamPath")]
+		public string StreamPath { get; set; }
+
+		/// <summary>
+		/// Resolution in the preview URL sent to SIMPL, for example 800x450 (the default). Decoders ask for their own
+		/// resolution, so this only sets what touch panel previews pull
+		/// </summary>
+		[JsonProperty("previewResolution")]
+		public string PreviewResolution { get; set; }
+
+		/// <summary>
 		/// Poll interval in milliseconds. Defaults to 30000. A negative value polls once at startup only
 		/// </summary>
 		[JsonProperty("pollTimeMs")]

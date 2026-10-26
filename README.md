@@ -29,7 +29,7 @@ Typical use: Axis IP camera → network → Axis D1110 → HDMI → DM-NVX encod
 1. Install the plugin (`epi-axis-camera.4Series.<version>.cplz`) on a CP4N running Essentials 3.0.0 or later.
 2. Add the devices to the Essentials configuration. Complete working files are in [examples/](examples/):
    * [configurationFile-axis-example.json](examples/configurationFile-axis-example.json): three cameras, two decoders and an EISC.
-   * [configurationFile-axis-indexed-bridge-example.json](examples/configurationFile-axis-indexed-bridge-example.json): many cameras on one EISC, with the address and login sent by SIMPL.
+   * [configurationFile-axis-indexed-example.json](examples/configurationFile-axis-indexed-example.json): many cameras on one EISC, laid out by camera number. SIMPL is sent the camera names and preview URLs.
    Replace the addresses, passwords and the plugin version.
 3. To control the devices from SIMPL, add them to an `eiscApiAdvanced` device (see [Bridge joins](#bridge-joins)).
 4. Check a device from the processor console: `devjson:1 {"deviceKey":"cam-left","methodName":"PrintStatus","params":[]}`. The device logs its configuration and goes online after the first poll.
@@ -52,6 +52,7 @@ Typical use: Axis IP camera → network → Axis D1110 → HDMI → DM-NVX encod
 | Recall a preset | Press PresetRecall 1 to 8 | Presets 1 to `presetCount` (up to 100) |
 | Save a preset | Send the preset number to the PresetSave analog join | Saves the camera's current position. Preset 1 also becomes the home position |
 | Restart the camera | Press Restart | |
+| Give SIMPL the camera's name and preview URL | Serial joins to SIMPL (see below) | The camera is configured once in Essentials. SIMPL gets the name and an RTSP URL for touch panel previews, so it needs no camera list of its own |
 | Check it is reachable | Online feedback, `Poll` | A `query=position` request every `pollTimeMs` |
 
 Presets are saved on the camera, so they survive a restart of the processor. By default they are *server presets* named `Preset01`, `Preset02`, ... (`"presetMode": "server"`). `"presetMode": "device"` uses the camera's numbered device presets instead.
@@ -117,6 +118,8 @@ VAPIX answers a PTZ command with `204 No Content` when it worked. A failed comma
 | `presets` | | Names for the presets, keyed by number. Others are "Preset N" |
 | `pollTimeMs` | 30000 | A negative value polls once at startup only |
 | `connectionSource` | `config` | `bridge`: the address, port and login come from SIMPL on serial joins, and the properties above are the fallback for any that are empty |
+| `streamPath` | `/axis-media/media.amp` | Path of the camera's main stream. Used for the preview URL sent to SIMPL and by decoder streams that name this camera |
+| `previewResolution` | `800x450` | Resolution in the preview URL sent to SIMPL. Decoders ask for their own resolution, so this only sets what touch panel previews pull |
 | `joinLayout` | `contiguous` | `indexed`: see [Indexed layout](#indexed-layout-many-cameras-on-one-eisc) |
 | `cameraIndex` | | Which camera this is (1 or higher) with the indexed layout |
 
@@ -262,8 +265,9 @@ Joins are offsets from `joinStart` (so the analog join of `cam-right` above that
 | 28 | Digital | To SIMPL | Camera online |
 | 1 | Analog | From SIMPL | Set to a preset number to save the current position as that preset |
 | 1 to 4 | Serial | From SIMPL | Address, port, username, password. Used when `connectionSource` is `bridge` |
-| 5 | Serial | To SIMPL | Device name |
+| 5 | Serial | To SIMPL | Camera name (the device name) |
 | 6 | Serial | To SIMPL | Last error |
+| 7 | Serial | To SIMPL | Preview URL: `rtsp://<host><streamPath>?resolution=<previewResolution>`, empty until the camera has an address |
 
 ### Indexed layout: many cameras on one EISC
 
@@ -271,11 +275,14 @@ With `"joinLayout": "indexed"` and a `cameraIndex`, many cameras share one EISC 
 
 * **Digital joins:** the table above, plus 30 for every camera before this one (camera `n` starts at `(n-1) × 30 + 1`).
 * **Analog:** preset save is analog join `n`.
-* **Serial:** address `n`, port `50 + n`, username `100 + n`, password `150 + n`, device name `200 + n`, last error `250 + n`.
+* **Serial from SIMPL** (only when `connectionSource` is `bridge`): address `n`, port `50 + n`, username `100 + n`, password `150 + n`.
+* **Serial to SIMPL:** camera name `n`, preview URL `50 + n`, last error `100 + n`. Serial joins to and from SIMPL are separate, so the numbers can repeat.
 
 Camera 3, for example: tilt up is digital 61, preset 1 recall is digital 77, the restart join is digital 86, preset save is analog 3, and the address is serial 3.
 
-This is the layout the old SIMPL camera program used for its 41 cameras, so a SIMPL program that talked to it can talk to this plugin unchanged: give the EISC the same IPID, set `connectionSource` to `bridge` so the address and login keep coming from SIMPL, and the cameras need no addresses in the Essentials configuration.
+This is the layout the old SIMPL camera program used for its 41 cameras, so a SIMPL program that talked to it can talk to this plugin: give the EISC the same IPID and the PTZ, preset and feedback joins are where they were.
+
+**Where the camera data lives.** Configure each camera once, in Essentials: address, login and name. SIMPL is sent only what it needs, the camera name and the preview URL. That removes the camera list (and the camera URLs and logins) from the SIMPL configuration files. `"connectionSource": "bridge"` still exists for systems that would rather keep the address and login in SIMPL, and is not needed for this layout.
 
 ## axisD1110 joins
 

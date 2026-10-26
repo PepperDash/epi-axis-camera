@@ -188,6 +188,7 @@ public class StreamBuilderTests
 		public string Host { get; set; } = "192.168.10.241";
 		public string Username { get; set; } = "admin";
 		public string Password { get; set; } = "axis1234";
+		public string StreamPath { get; set; } = "/axis-media/media.amp";
 	}
 
 	private static AxisD1110StreamConfig BuildWithCamera(AxisD1110Config config, AxisD1110StreamConfig stream, IAxisCameraSource camera, string bridgeUrl = null)
@@ -229,6 +230,16 @@ public class StreamBuilderTests
 		var config = new AxisD1110Config { CameraStreamPath = path };
 
 		BuildWithCamera(config, new AxisD1110StreamConfig { CameraKey = "cam-33" }, new FakeCamera()).Url.Should().Be(expected);
+	}
+
+	[Fact]
+	public void Camera_UsesTheCamerasStreamPathUnlessTheDecoderSetsOne()
+	{
+		var camera = new FakeCamera { StreamPath = "/camera/main" };
+		var stream = new AxisD1110StreamConfig { CameraKey = "cam-33" };
+
+		BuildWithCamera(new AxisD1110Config(), stream, camera).Url.Should().Be("rtsp://192.168.10.241/camera/main");
+		BuildWithCamera(new AxisD1110Config { CameraStreamPath = "/decoder/path" }, stream, camera).Url.Should().Be("rtsp://192.168.10.241/decoder/path");
 	}
 
 	[Fact]

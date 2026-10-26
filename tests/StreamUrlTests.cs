@@ -127,6 +127,27 @@ public class StreamUrlTests
 			.ToUrl().Should().Be("rtsp://h/axis-media/media.amp?resolution=800x450");
 	}
 
+	[Theory]
+	[InlineData("192.168.10.241", null, "800x450", "rtsp://192.168.10.241/axis-media/media.amp?resolution=800x450")]
+	[InlineData("192.168.10.241", "", "800x450", "rtsp://192.168.10.241/axis-media/media.amp?resolution=800x450")]
+	[InlineData("192.168.10.241", "/axis-media/media.amp", null, "rtsp://192.168.10.241/axis-media/media.amp")]
+	[InlineData("192.168.10.241", "stream/live", "1920x1080", "rtsp://192.168.10.241/stream/live?resolution=1920x1080")]
+	[InlineData(" 192.168.10.241 ", "/axis-media/media.amp?videocodec=h264", "800x450", "rtsp://192.168.10.241/axis-media/media.amp?videocodec=h264&resolution=800x450")]
+	[InlineData("cam.example.com", "/axis-media/media.amp?resolution=640x360", "800x450", "rtsp://cam.example.com/axis-media/media.amp?resolution=800x450")]
+	public void ForCamera_BuildsTheCameraStreamUrl(string host, string path, string resolution, string expected)
+	{
+		AxisStreamUrl.ForCamera(host, path, resolution).Should().Be(expected);
+	}
+
+	[Theory]
+	[InlineData(null)]
+	[InlineData("")]
+	[InlineData("   ")]
+	public void ForCamera_NoHostYetGivesAnEmptyUrl(string host)
+	{
+		AxisStreamUrl.ForCamera(host, "/axis-media/media.amp", "800x450").Should().BeEmpty();
+	}
+
 	[Fact]
 	public void WithResolution_KeepsTheLogin()
 	{
