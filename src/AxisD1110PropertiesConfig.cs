@@ -28,6 +28,29 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 	public class AxisD1110Config : AxisHttpConfig
 	{
 		/// <summary>
+		/// "contiguous" (default): the joins follow each other from the joinStart of the bridge entry.
+		/// "indexed": up to 8 decoders share one small EISC, laid out by decoderIndex (see the README). Use joinStart 1.
+		/// The stream name and stream URL joins are not available in the indexed layout
+		/// </summary>
+		[JsonProperty("joinLayout")]
+		public string JoinLayout { get; set; }
+
+		/// <summary>
+		/// True when the indexed join layout is used
+		/// </summary>
+		[JsonIgnore]
+		public bool IsIndexedLayout
+		{
+			get { return string.Equals(JoinLayout, "indexed", System.StringComparison.OrdinalIgnoreCase); }
+		}
+
+		/// <summary>
+		/// Which decoder this is (1 to 8) in the indexed join layout
+		/// </summary>
+		[JsonProperty("decoderIndex")]
+		public int DecoderIndex { get; set; }
+
+		/// <summary>
 		/// Poll interval in milliseconds. Defaults to 30000. A negative value disables polling
 		/// </summary>
 		[JsonProperty("pollTimeMs")]

@@ -18,7 +18,7 @@
   "system_url": "",
   "template": {
     "info": {
-      "comment": "Example: many cameras on one EISC, laid out by camera number (joinLayout indexed, joinStart 1 for every camera). The cameras are configured here, once: address, login and name. SIMPL is sent only what it needs: the camera name (serial join n) and a preview URL for the touch panels (serial join 50 + n). The decoder streams are the cameras (cameraKey), at their own resolution.",
+      "comment": "Example: many cameras on one EISC, laid out by camera number (joinLayout indexed, joinStart 1 for every camera). The cameras are configured here, once: address, login and name. SIMPL is sent only what it needs: the camera name (serial join n) and a preview URL for the touch panels (serial join 50 + n). The decoder streams are the cameras (cameraKey), at their own resolution. The decoders use the indexed layout too (decoderIndex, up to 8 on one small EISC).",
       "systemType": "huddle",
       "processorType": "cp4n",
       "lastUid": 7
@@ -104,13 +104,15 @@
             "3": {
               "cameraKey": "cam-03"
             }
-          }
+          },
+          "joinLayout": "indexed",
+          "decoderIndex": 1
         }
       },
       {
         "key": "eisc-cameras",
         "uid": 6,
-        "name": "Cameras EISC",
+        "name": "Axis Cameras EISC",
         "type": "eiscApiAdvanced",
         "group": "api",
         "properties": {
@@ -119,7 +121,7 @@
               "address": "127.0.0.2",
               "port": 0
             },
-            "ipid": "31"
+            "ipid": "F2"
           },
           "devices": [
             {
@@ -140,7 +142,7 @@
       {
         "key": "eisc-decoders",
         "uid": 7,
-        "name": "Decoder EISC",
+        "name": "Axis Decoders EISC",
         "type": "eiscApiAdvanced",
         "group": "api",
         "properties": {
@@ -149,7 +151,7 @@
               "address": "127.0.0.2",
               "port": 0
             },
-            "ipid": "F2"
+            "ipid": "F3"
           },
           "devices": [
             {

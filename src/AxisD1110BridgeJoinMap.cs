@@ -5,8 +5,21 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 	/// <summary>
 	/// Axis D1110 bridge join map
 	/// </summary>
+	/// <remarks>
+	/// Contiguous layout (default): every join is an offset from the joinStart of the bridge entry.
+	///
+	/// Indexed layout, for one small EISC shared by up to 8 decoders (decoder n, n starting at 1, use joinStart 1):
+	/// digital online n, clear 8+n, refresh 16+n. Analog select stream n, last error code 8+n.
+	/// Serial device name n, selected stream name 8+n, last error 16+n, configuration id 24+n.
+	/// The stream names and stream URLs joins are not used. Everything fits in 32 joins of each type.
+	/// </remarks>
 	public class AxisD1110BridgeJoinMap : JoinMapBaseAdvanced
 	{
+		/// <summary>
+		/// Most decoders the indexed layout can hold
+		/// </summary>
+		public const int MaxIndexedDecoders = 8;
+
 		#region Digital
 
 		[JoinName("IsOnline")]
@@ -136,6 +149,36 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 		public AxisD1110BridgeJoinMap(uint joinStart)
 			: base(joinStart, typeof(AxisD1110BridgeJoinMap))
 		{
+		}
+
+		/// <summary>
+		/// Constructor that applies the indexed layout when decoderIndex is 1 to 8
+		/// </summary>
+		/// <param name="joinStart">The first join on the EISC bridge. Use 1 with the indexed layout</param>
+		/// <param name="decoderIndex">Which decoder this is in the indexed layout, or 0 for the contiguous layout</param>
+		public AxisD1110BridgeJoinMap(uint joinStart, int decoderIndex)
+			: this(joinStart)
+		{
+			if (decoderIndex >= 1 && decoderIndex <= MaxIndexedDecoders)
+			{
+				ApplyIndexedLayout((uint)decoderIndex);
+			}
+		}
+
+		private void ApplyIndexedLayout(uint index)
+		{
+			// raw numbers, so the joinStart offset is added once on top
+			IsOnline.JoinNumber = index;
+			Clear.JoinNumber = 8 + index;
+			Refresh.JoinNumber = 16 + index;
+
+			SelectStream.JoinNumber = index;
+			LastErrorCode.JoinNumber = 8 + index;
+
+			DeviceName.JoinNumber = index;
+			SelectedStreamName.JoinNumber = 8 + index;
+			LastError.JoinNumber = 16 + index;
+			ConfigurationId.JoinNumber = 24 + index;
 		}
 	}
 }

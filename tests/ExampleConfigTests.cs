@@ -126,8 +126,19 @@ public class ExampleConfigTests
 			indexed.All(d => onThisEisc.Single(l => l.Value<string>("deviceKey") == d.Value<string>("key")).Value<int>("joinStart") == 1)
 				.Should().BeTrue("indexed cameras use joinStart 1");
 
+			var indexedDecoders = onThisEisc
+				.Select(l => devices.Single(d => d.Value<string>("key") == l.Value<string>("deviceKey")))
+				.Where(d => d.Value<string>("type") == "axisD1110" && d["properties"]!.ToObject<AxisD1110Config>()!.IsIndexedLayout)
+				.ToList();
+
+			indexedDecoders.Select(d => d["properties"]!.Value<int>("decoderIndex")).Should().OnlyHaveUniqueItems();
+			indexedDecoders.All(d => d["properties"]!.Value<int>("decoderIndex") is >= 1 and <= 8).Should().BeTrue("decoderIndex is 1 to 8");
+			indexedDecoders.All(d => onThisEisc.Single(l => l.Value<string>("deviceKey") == d.Value<string>("key")).Value<int>("joinStart") == 1)
+				.Should().BeTrue("indexed decoders use joinStart 1");
+
 			var contiguous = onThisEisc
-				.Where(l => !indexed.Any(d => d.Value<string>("key") == l.Value<string>("deviceKey")))
+				.Where(l => !indexed.Any(d => d.Value<string>("key") == l.Value<string>("deviceKey"))
+					&& !indexedDecoders.Any(d => d.Value<string>("key") == l.Value<string>("deviceKey")))
 				.Select(l => l.Value<int>("joinStart"))
 				.OrderBy(s => s)
 				.ToList();

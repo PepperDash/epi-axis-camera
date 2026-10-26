@@ -80,6 +80,16 @@ public class DecoderConfigTests
 	}
 
 	[Fact]
+	public void Config_ReadsTheJoinLayoutAndDecoderIndex()
+	{
+		var config = JsonConvert.DeserializeObject<AxisD1110Config>("{\"host\":\"10.0.0.5\",\"joinLayout\":\"Indexed\",\"decoderIndex\":3}");
+
+		config.IsIndexedLayout.Should().BeTrue();
+		config.DecoderIndex.Should().Be(3);
+		JsonConvert.DeserializeObject<AxisD1110Config>("{\"host\":\"10.0.0.5\"}").IsIndexedLayout.Should().BeFalse();
+	}
+
+	[Fact]
 	public void Config_MinimalPropertiesUseDefaults()
 	{
 		var config = JsonConvert.DeserializeObject<AxisD1110Config>("{\"host\":\"10.0.0.5\"}");

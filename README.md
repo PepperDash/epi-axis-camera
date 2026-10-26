@@ -210,6 +210,8 @@ If a stream's URL changes while it is on screen, the plugin sends the new one to
 | `resolution` | | Resolution to request, for example `1920x1080`. Empty leaves the URL as received |
 | `cameraStreamPath` | `/axis-media/media.amp` | Path of the stream on a camera, for streams with a `cameraKey` |
 | `streamUsername`, `streamPassword` | | Camera login when nothing else supplies one |
+| `joinLayout` | `contiguous` | `indexed`: up to 8 decoders share one small EISC, see [Indexed layout (decoders)](#indexed-layout-decoders-on-one-small-eisc) |
+| `decoderIndex` | | Which decoder this is (1 to 8) with the indexed layout |
 | `streams` | | Keyed 1 to 16. Each has `cameraKey` or `url`, optional `name`, `resolution`, `videoCodec` (H264 default, MJPEG, MPEG4), `audioCodec` (default none), and `username` / `password` which override any other login |
 
 The stream number is what SIMPL sends, so keep the same numbers on every decoder that serves the same kind of camera (for example 1 = Left PTZ, 2 = Right PTZ, 3 = Monopod).
@@ -299,6 +301,24 @@ This is the layout the old SIMPL camera program used for its 41 cameras, so a SI
 | 4 | Serial | To SIMPL | Decoder configuration id |
 | 11 to 26 | Serial | To SIMPL | Stream names, in stream number order |
 | 31 to 46 | Serial | From SIMPL | Stream RTSP URLs. Used when `streamSource` is `bridge` |
+
+### Indexed layout: decoders on one small EISC
+
+With `"joinLayout": "indexed"` and a `decoderIndex` from 1 to 8, up to eight decoders share one EISC of 32 joins of each type, and are told apart by their number `n` (give every decoder `joinStart` 1):
+
+| Join | Type | Direction | Description |
+|---|---|---|---|
+| `n` | Digital | To SIMPL | Decoder online |
+| `8 + n` | Digital | From SIMPL | Pulse to blank the output |
+| `16 + n` | Digital | From SIMPL | Pulse to poll now |
+| `n` | Analog | To/From SIMPL | Stream to show (1 to 16, 0 blanks) and selected stream feedback |
+| `8 + n` | Analog | To SIMPL | Last Decoder API error code |
+| `n` | Serial | To SIMPL | Device name |
+| `8 + n` | Serial | To SIMPL | Selected stream name |
+| `16 + n` | Serial | To SIMPL | Last error message |
+| `24 + n` | Serial | To SIMPL | Decoder configuration id |
+
+The stream names and stream URL joins do not exist in the indexed layout, so use streams that name a camera (`cameraKey`) or a URL in the configuration, not `streamSource` `bridge`.
 
 ---
 

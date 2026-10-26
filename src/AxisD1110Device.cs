@@ -467,7 +467,21 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 		/// </summary>
 		public override void LinkToApi(BasicTriList trilist, uint joinStart, string joinMapKey, EiscApiAdvanced bridge)
 		{
-			var joinMap = new AxisD1110BridgeJoinMap(joinStart);
+			var indexed = config.IsIndexedLayout;
+
+			if (indexed && (config.DecoderIndex < 1 || config.DecoderIndex > AxisD1110BridgeJoinMap.MaxIndexedDecoders))
+			{
+				this.LogWarning("joinLayout is indexed but decoderIndex is {index}. It must be 1 to {max}, using the contiguous layout",
+					config.DecoderIndex, AxisD1110BridgeJoinMap.MaxIndexedDecoders);
+				indexed = false;
+			}
+
+			if (indexed && config.IsBridgeSource)
+			{
+				this.LogWarning("streamSource bridge needs the stream URL joins, which the indexed layout does not have. Stream URLs from SIMPL will not arrive");
+			}
+
+			var joinMap = new AxisD1110BridgeJoinMap(joinStart, indexed ? config.DecoderIndex : 0);
 
 			// This adds the join map to the collection on the bridge
 			bridge?.AddJoinMap(Key, joinMap);
@@ -488,7 +502,10 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 			trilist.SetSigTrueAction(joinMap.Clear.JoinNumber, Clear);
 			trilist.SetSigTrueAction(joinMap.Refresh.JoinNumber, Poll);
 
-			if (config.IsBridgeSource)
+			this.LogInformation("Linked ({layout} layout): select stream is analog join {select}, online is digital join {online}",
+				indexed ? "indexed" : "contiguous", joinMap.SelectStream.JoinNumber, joinMap.IsOnline.JoinNumber);
+
+			if (config.IsBridgeSource && !indexed)
 			{
 				this.LogInformation("Stream URLs come from the bridge, serial joins {start} to {end}", joinMap.StreamUrls.JoinNumber, joinMap.StreamUrls.JoinNumber + MaxStreams - 1);
 
@@ -506,21 +523,22 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 			LastErrorFeedback.LinkInputSig(trilist.StringInput[joinMap.LastError.JoinNumber]);
 			ConfigurationIdFeedback.LinkInputSig(trilist.StringInput[joinMap.ConfigurationId.JoinNumber]);
 
-			UpdateFeedbacks(trilist, joinMap);
+			UpdateFeedbacks(trilist, joinMap, indexed);
 
 			trilist.OnlineStatusChange += (o, a) =>
 			{
 				if (!a.DeviceOnLine) return;
 
-				UpdateFeedbacks(trilist, joinMap);
+				UpdateFeedbacks(trilist, joinMap, indexed);
 			};
 		}
 
-		private void UpdateFeedbacks(BasicTriList trilist, AxisD1110BridgeJoinMap joinMap)
+		private void UpdateFeedbacks(BasicTriList trilist, AxisD1110BridgeJoinMap joinMap, bool indexed)
 		{
 			trilist.SetString(joinMap.DeviceName.JoinNumber, Name);
 
-			for (var number = 1; number <= MaxStreams; number++)
+			// the stream names have no joins in the indexed layout
+			for (var number = 1; number <= MaxStreams && !indexed; number++)
 			{
 				AxisD1110StreamConfig configured;
 				streams.TryGetValue(number, out configured);
