@@ -258,6 +258,29 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 			}));
 		}
 
+		// the select join may be driven by something that also carries numbers that are not streams (a display's selected source)
+		private void OnSelectJoin(ushort value)
+		{
+			if (!AxisD1110Select.ShouldSelect(value, config.SelectOnlyConfiguredStreams, IsConfiguredStream))
+			{
+				this.LogDebug("Ignoring select value {value}: it is not a configured stream", value);
+				return;
+			}
+
+			SelectStream(value);
+		}
+
+		private bool IsConfiguredStream(int number)
+		{
+			if (streams.ContainsKey(number)) return true;
+
+			string url;
+			lock (bridgeUrls)
+			{
+				return bridgeUrls.TryGetValue(number, out url) && !string.IsNullOrEmpty(url);
+			}
+		}
+
 		private void StartPolling()
 		{
 			var pollTimeMs = config.PollTimeMs == 0 ? DefaultPollTimeMs : config.PollTimeMs;
@@ -498,7 +521,7 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 
 			trilist.SetString(joinMap.DeviceName.JoinNumber, Name);
 
-			trilist.SetUShortSigAction(joinMap.SelectStream.JoinNumber, value => SelectStream(value));
+			trilist.SetUShortSigAction(joinMap.SelectStream.JoinNumber, OnSelectJoin);
 			trilist.SetSigTrueAction(joinMap.Clear.JoinNumber, Clear);
 			trilist.SetSigTrueAction(joinMap.Refresh.JoinNumber, Poll);
 

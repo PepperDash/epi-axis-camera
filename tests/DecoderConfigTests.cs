@@ -80,6 +80,13 @@ public class DecoderConfigTests
 	}
 
 	[Fact]
+	public void Config_SelectOnlyConfiguredStreamsDefaultsToOff()
+	{
+		JsonConvert.DeserializeObject<AxisD1110Config>("{\"host\":\"10.0.0.5\"}").SelectOnlyConfiguredStreams.Should().BeFalse();
+		JsonConvert.DeserializeObject<AxisD1110Config>("{\"host\":\"10.0.0.5\",\"selectOnlyConfiguredStreams\":true}").SelectOnlyConfiguredStreams.Should().BeTrue();
+	}
+
+	[Fact]
 	public void Config_ReadsTheJoinLayoutAndDecoderIndex()
 	{
 		var config = JsonConvert.DeserializeObject<AxisD1110Config>("{\"host\":\"10.0.0.5\",\"joinLayout\":\"Indexed\",\"decoderIndex\":3}");

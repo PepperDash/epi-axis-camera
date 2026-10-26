@@ -212,6 +212,7 @@ If a stream's URL changes while it is on screen, the plugin sends the new one to
 | `streamUsername`, `streamPassword` | | Camera login when nothing else supplies one |
 | `joinLayout` | `contiguous` | `indexed`: up to 8 decoders share one small EISC, see [Indexed layout (decoders)](#indexed-layout-decoders-on-one-small-eisc) |
 | `decoderIndex` | | Which decoder this is (1 to 8) with the indexed layout |
+| `selectOnlyConfiguredStreams` | false | When true, the select stream join only acts on numbers that are configured streams, and ignores everything else including 0 (use the clear join to blank). Use it when the join is driven by a display's selected source: the camera buttons are sources 1 to 3 and the other sources are not streams |
 | `streams` | | Keyed 1 to 16. Each has `cameraKey` or `url`, optional `name`, `resolution`, `videoCodec` (H264 default, MJPEG, MPEG4), `audioCodec` (default none), and `username` / `password` which override any other login |
 
 The stream number is what SIMPL sends, so keep the same numbers on every decoder that serves the same kind of camera (for example 1 = Left PTZ, 2 = Right PTZ, 3 = Monopod).

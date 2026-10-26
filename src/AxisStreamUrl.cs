@@ -205,6 +205,25 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 	}
 
 	/// <summary>
+	/// Decides whether a value sent on the select stream join is acted on
+	/// </summary>
+	public static class AxisD1110Select
+	{
+		/// <summary>
+		/// True when the value should select a stream
+		/// </summary>
+		/// <param name="value">What SIMPL sent on the select stream join</param>
+		/// <param name="onlyConfiguredStreams">The selectOnlyConfiguredStreams property</param>
+		/// <param name="isConfigured">Whether a stream number is a configured stream</param>
+		public static bool ShouldSelect(int value, bool onlyConfiguredStreams, System.Func<int, bool> isConfigured)
+		{
+			if (!onlyConfiguredStreams) return true;
+
+			return value >= 1 && isConfigured(value);
+		}
+	}
+
+	/// <summary>
 	/// Turns a stream's configuration, and the URL SIMPL may have sent, into what is sent to the decoder
 	/// </summary>
 	public static class AxisD1110StreamBuilder

@@ -51,6 +51,14 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 		public int DecoderIndex { get; set; }
 
 		/// <summary>
+		/// When true, the select stream join only acts on numbers that are configured streams. Any other value, including 0, is
+		/// ignored (use the clear join to blank the output). Use it when the join is driven by something that also carries other
+		/// numbers, such as a display's selected source, where the camera buttons are sources 1 to 3 and everything else is not a stream
+		/// </summary>
+		[JsonProperty("selectOnlyConfiguredStreams")]
+		public bool SelectOnlyConfiguredStreams { get; set; }
+
+		/// <summary>
 		/// Poll interval in milliseconds. Defaults to 30000. A negative value disables polling
 		/// </summary>
 		[JsonProperty("pollTimeMs")]
