@@ -189,6 +189,8 @@ public class StreamBuilderTests
 		public string Username { get; set; } = "admin";
 		public string Password { get; set; } = "axis1234";
 		public string StreamPath { get; set; } = "/axis-media/media.amp";
+		public bool PrivacyHidesVideo { get; set; }
+		public event EventHandler PrivacyChanged { add { } remove { } }
 	}
 
 	private static AxisD1110StreamConfig BuildWithCamera(AxisD1110Config config, AxisD1110StreamConfig stream, IAxisCameraSource camera, string bridgeUrl = null)

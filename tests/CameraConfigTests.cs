@@ -51,6 +51,14 @@ public class CameraConfigTests
 	}
 
 	[Fact]
+	public void Config_PrivacyClearsStreamIsOnUnlessSetOff()
+	{
+		JsonConvert.DeserializeObject<AxisCameraConfig>("{\"host\":\"10.0.0.5\"}").PrivacyClearsStream.Should().BeNull("unset means on");
+		JsonConvert.DeserializeObject<AxisCameraConfig>("{\"host\":\"10.0.0.5\",\"privacyClearsStream\":false}").PrivacyClearsStream.Should().BeFalse();
+		JsonConvert.DeserializeObject<AxisCameraConfig>("{\"host\":\"10.0.0.5\",\"privacyClearsStream\":true}").PrivacyClearsStream.Should().BeTrue();
+	}
+
+	[Fact]
 	public void Config_MinimalPropertiesUseDefaults()
 	{
 		var config = JsonConvert.DeserializeObject<AxisCameraConfig>("{\"host\":\"10.0.0.5\"}");

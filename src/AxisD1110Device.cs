@@ -29,6 +29,7 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 
 		private const string SelectPrefix = "select:";
 		private const string PollCommand = "poll";
+		private const string PrivacyCommand = "privacy";
 
 		private readonly AxisD1110Config config;
 		private readonly AxisD1110DecoderClient client;
@@ -40,6 +41,7 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 		private bool online;
 		private int selectedStream;
 		private bool selectionMade;
+		private bool blankedByPrivacy;
 		private string configurationId = string.Empty;
 		private int lastErrorCode;
 		private string lastError = string.Empty;
@@ -123,6 +125,7 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 			ConfigurationIdFeedback = new StringFeedback("configurationId", () => configurationId);
 
 			AddPostActivationAction(StartPolling);
+			AddPostActivationAction(SubscribeToCameras);
 		}
 
 		/// <summary>
@@ -281,6 +284,50 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 			}
 		}
 
+		// privacy on a camera hides its video everywhere, so a decoder showing that camera blanks until privacy ends
+		private void SubscribeToCameras()
+		{
+			var followed = new HashSet<string>();
+
+			foreach (var stream in streams.Values)
+			{
+				if (string.IsNullOrEmpty(stream.CameraKey) || !followed.Add(stream.CameraKey)) continue;
+
+				var camera = DeviceManager.GetDeviceForKey(stream.CameraKey) as IAxisCameraSource;
+				if (camera == null)
+				{
+					this.LogWarning("Camera {key} was not found, so privacy on it cannot hide this decoder", stream.CameraKey);
+					continue;
+				}
+
+				camera.PrivacyChanged += OnCameraPrivacyChanged;
+				this.LogInformation("Following privacy of camera {key}", stream.CameraKey);
+			}
+		}
+
+		private void OnCameraPrivacyChanged(object sender, EventArgs e)
+		{
+			commandQueue.Enqueue(new ProcessStringMessage(PrivacyCommand, ProcessCommand));
+		}
+
+		private void ProcessPrivacy()
+		{
+			if (selectedStream < 1) return;
+
+			AxisD1110StreamConfig configured;
+			if (!streams.TryGetValue(selectedStream, out configured) || string.IsNullOrEmpty(configured.CameraKey)) return;
+
+			var camera = DeviceManager.GetDeviceForKey(configured.CameraKey) as IAxisCameraSource;
+			if (camera == null) return;
+
+			var action = AxisPrivacy.Plan(camera.PrivacyHidesVideo, blankedByPrivacy);
+			this.LogInformation("Privacy changed on camera {key} (hides video: {hides}). Stream {number} on screen: {action}",
+				configured.CameraKey, camera.PrivacyHidesVideo, selectedStream, action);
+
+			// selecting the stream again either blanks the output (camera in privacy) or shows it (privacy over)
+			if (action != AxisPrivacyAction.None) ProcessSelect(selectedStream);
+		}
+
 		private void StartPolling()
 		{
 			var pollTimeMs = config.PollTimeMs == 0 ? DefaultPollTimeMs : config.PollTimeMs;
@@ -305,6 +352,10 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 				{
 					ProcessSelect(int.Parse(command.Substring(SelectPrefix.Length)));
 				}
+				else if (command == PrivacyCommand)
+				{
+					ProcessPrivacy();
+				}
 			}
 			catch (Exception ex)
 			{
@@ -315,6 +366,7 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 		private void ProcessSelect(int number)
 		{
 			AxisD1110StreamConfig stream = null;
+			var hiddenByPrivacy = false;
 
 			if (number != 0)
 			{
@@ -338,18 +390,33 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 						? null
 						: DeviceManager.GetDeviceForKey(configured.CameraKey) as IAxisCameraSource;
 
-					AxisD1110StreamBuilder.TryBuild(config, configured, bridgeUrl, camera, out stream, out error);
+					if (camera != null && camera.PrivacyHidesVideo)
+					{
+						hiddenByPrivacy = true;
+					}
+					else
+					{
+						AxisD1110StreamBuilder.TryBuild(config, configured, bridgeUrl, camera, out stream, out error);
+					}
 				}
 
-				if (stream == null)
+				if (stream == null && !hiddenByPrivacy)
 				{
 					this.LogWarning("Stream {number} cannot be used: {error}", number, error);
 					SetError(-3, string.Format("Stream {0}: {1}", number, error));
 					return;
 				}
 
-				this.LogInformation("Selecting stream {number} {name}: {url} login={login} resolution={resolution}",
-					number, StreamName(number), stream.Url, string.IsNullOrEmpty(stream.Username) ? "none" : stream.Username, ResolutionOf(stream.Url));
+				if (hiddenByPrivacy)
+				{
+					this.LogInformation("Stream {number} ({name}) is hidden: camera {key} is in privacy. Blanking the decoder output",
+						number, StreamName(number), configured.CameraKey);
+				}
+				else
+				{
+					this.LogInformation("Selecting stream {number} {name}: {url} login={login} resolution={resolution}",
+						number, StreamName(number), stream.Url, string.IsNullOrEmpty(stream.Username) ? "none" : stream.Username, ResolutionOf(stream.Url));
+				}
 			}
 			else
 			{
@@ -369,6 +436,7 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 				number, StreamName(number), result.ConfigurationId, result.ErrorCode, result.ErrorMessage);
 
 			selectionMade = true;
+			blankedByPrivacy = hiddenByPrivacy;
 			selectedStream = number;
 			configurationId = result.ConfigurationId ?? string.Empty;
 			SetOnline(true);

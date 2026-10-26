@@ -205,6 +205,58 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 	}
 
 	/// <summary>
+	/// What a decoder does when the camera it is showing enters or leaves privacy
+	/// </summary>
+	public enum AxisPrivacyAction
+	{
+		/// <summary>
+		/// Nothing changes
+		/// </summary>
+		None,
+
+		/// <summary>
+		/// Blank the decoder output
+		/// </summary>
+		Blank,
+
+		/// <summary>
+		/// Show the selected stream again
+		/// </summary>
+		Restore
+	}
+
+	/// <summary>
+	/// Rules for camera privacy: privacy hides the camera's video everywhere, in addition to the camera moving to its privacy preset
+	/// </summary>
+	public static class AxisPrivacy
+	{
+		/// <summary>
+		/// The preview URL SIMPL is sent: empty while the camera's video is hidden by privacy
+		/// </summary>
+		/// <param name="host">Camera address</param>
+		/// <param name="path">Stream path</param>
+		/// <param name="resolution">Preview resolution</param>
+		/// <param name="hidden">True while privacy hides the camera's video</param>
+		public static string PreviewUrl(string host, string path, string resolution, bool hidden)
+		{
+			return hidden ? string.Empty : AxisStreamUrl.ForCamera(host, path, resolution);
+		}
+
+		/// <summary>
+		/// What a decoder showing a camera should do now
+		/// </summary>
+		/// <param name="cameraHidesVideo">The camera's video is hidden by privacy</param>
+		/// <param name="outputBlankedByPrivacy">The decoder output is currently blanked because of privacy</param>
+		public static AxisPrivacyAction Plan(bool cameraHidesVideo, bool outputBlankedByPrivacy)
+		{
+			if (cameraHidesVideo && !outputBlankedByPrivacy) return AxisPrivacyAction.Blank;
+			if (!cameraHidesVideo && outputBlankedByPrivacy) return AxisPrivacyAction.Restore;
+
+			return AxisPrivacyAction.None;
+		}
+	}
+
+	/// <summary>
 	/// Decides whether a value sent on the select stream join is acted on
 	/// </summary>
 	public static class AxisD1110Select

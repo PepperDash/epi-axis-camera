@@ -52,6 +52,7 @@ Typical use: Axis IP camera → network → Axis D1110 → HDMI → DM-NVX encod
 | Recall a preset | Press PresetRecall 1 to 8 | Presets 1 to `presetCount` (up to 100) |
 | Save a preset | Send the preset number to the PresetSave analog join | Saves the camera's current position. Preset 1 also becomes the home position |
 | Restart the camera | Press Restart | |
+| Hide a camera's video everywhere (privacy) | Hold the Privacy join high, or call `SetPrivacy` | Clears the preview URL sent to SIMPL and blanks every decoder showing this camera. See [Privacy](#privacy) |
 | Give SIMPL the camera's name and preview URL | Serial joins to SIMPL (see below) | The camera is configured once in Essentials. SIMPL gets the name and an RTSP URL for touch panel previews, so it needs no camera list of its own |
 | Check it is reachable | Online feedback, `Poll` | A `query=position` request every `pollTimeMs` |
 
@@ -77,6 +78,17 @@ Essentials code can also use the camera through the standard interfaces: `IHasCa
 According to the [Axis datasheet](https://axis.com/dam/public/d0/14/73/datasheet-axis-m5526-e-ptz-camera-pt-BR-475289.pdf), the M5526-E has continuous 360° pan, 0 to 90° tilt, 10x optical zoom and 100 preset positions, so `presetCount` can go up to 100. Whether it accepts the VAPIX iris commands has not been checked on a camera. If it does not, an iris request is answered with an error, which the plugin logs once and shows in Last error; nothing else is affected. Run `{"methodName":"SendRequest","params":["/axis-cgi/com/ptz.cgi?info=1"]}` on the bench to list the PTZ commands the camera really offers.
 
 Axis announces a discontinuation for this model on its [support page](https://www.axis.com/en-ca/products/axis-m5526-e/support), so check availability before ordering more.
+
+### Privacy
+
+Privacy hides a camera's video everywhere, in addition to the camera moving to its privacy preset. Hold the Privacy join high (or call `SetPrivacy` with `true`) and, with `privacyClearsStream` (the default):
+
+* **The preview URL sent to SIMPL is cleared**, so touch panel previews of this camera stop.
+* **Every `axisD1110` decoder showing this camera is blanked.** The decoder remembers the stream it was asked to show, and shows it again when privacy ends. Selecting a stream whose camera is in privacy keeps the output blank until privacy ends.
+
+Moving the camera to its privacy position is not done here. Whatever recalls the preset (the main program's privacy logic recalls a preset through the preset joins) keeps doing it, so the join and the preset recall do not conflict and the order they arrive in does not matter. The camera's controls are not blocked by this plugin.
+
+What this cannot do: anything that pulls the camera's RTSP stream directly (a recorder, for example) is not affected. Only the video this plugin sends and the decoders it controls are.
 
 ### How the camera answers
 
@@ -120,6 +132,7 @@ VAPIX answers a PTZ command with `204 No Content` when it worked. A failed comma
 | `connectionSource` | `config` | `bridge`: the address, port and login come from SIMPL on serial joins, and the properties above are the fallback for any that are empty |
 | `streamPath` | `/axis-media/media.amp` | Path of the camera's main stream. Used for the preview URL sent to SIMPL and by decoder streams that name this camera |
 | `previewResolution` | `800x450` | Resolution in the preview URL sent to SIMPL. Decoders ask for their own resolution, so this only sets what touch panel previews pull |
+| `privacyClearsStream` | true | When privacy is on for this camera, clear its preview URL and blank the decoders showing it. `false` makes privacy only a reported state |
 | `joinLayout` | `contiguous` | `indexed`: see [Indexed layout](#indexed-layout-many-cameras-on-one-eisc) |
 | `cameraIndex` | | Which camera this is (1 or higher) with the indexed layout |
 
@@ -266,6 +279,7 @@ Joins are offsets from `joinStart` (so the analog join of `cam-right` above that
 | 26 | Digital | From SIMPL | Press to restart the camera |
 | 27 | Digital | From SIMPL | Press to move to the home position |
 | 28 | Digital | To SIMPL | Camera online |
+| 29 | Digital | To/From SIMPL | Privacy. Held high while the camera is in privacy. Feedback is the state |
 | 1 | Analog | From SIMPL | Set to a preset number to save the current position as that preset |
 | 1 to 4 | Serial | From SIMPL | Address, port, username, password. Used when `connectionSource` is `bridge` |
 | 5 | Serial | To SIMPL | Camera name (the device name) |

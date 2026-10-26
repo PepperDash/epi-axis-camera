@@ -16,6 +16,9 @@ public class JoinMapTests
 		map.PresetRecall.JoinSpan.Should().Be(8);
 		map.PresetStored.JoinNumber.Should().Be(25);
 		map.Restart.JoinNumber.Should().Be(26);
+		map.Home.JoinNumber.Should().Be(27);
+		map.IsOnline.JoinNumber.Should().Be(28);
+		map.Privacy.JoinNumber.Should().Be(29);
 		map.PresetSave.JoinNumber.Should().Be(1);
 		map.Host.JoinNumber.Should().Be(1);
 		map.Password.JoinNumber.Should().Be(4);
@@ -61,6 +64,9 @@ public class JoinMapTests
 		map.PresetRecall.JoinNumber.Should().Be(firstJoin + 16);
 		map.PresetStored.JoinNumber.Should().Be(firstJoin + 24);
 		map.Restart.JoinNumber.Should().Be(firstJoin + 25);
+		map.Home.JoinNumber.Should().Be(firstJoin + 26);
+		map.IsOnline.JoinNumber.Should().Be(firstJoin + 27);
+		map.Privacy.JoinNumber.Should().Be(firstJoin + 28);
 	}
 
 	[Theory]
@@ -121,7 +127,7 @@ public class JoinMapTests
 			{
 				map.Up, map.Down, map.Left, map.Right, map.UpRight, map.DownRight, map.UpLeft, map.DownLeft, map.ZoomIn, map.ZoomOut,
 				map.FocusFar, map.FocusNear, map.AutoFocus, map.IrisOpen, map.IrisClose, map.AutoIris, map.PresetStored, map.Restart,
-				map.Home, map.IsOnline
+				map.Home, map.IsOnline, map.Privacy
 			})
 			{
 				used.Add(join.JoinNumber).Should().BeTrue("camera {0} join {1} must not repeat", camera, join.JoinNumber);
@@ -146,6 +152,7 @@ public class JoinMapTests
 		map.PresetRecall.JoinNumber.Should().Be(77);
 		map.PresetStored.JoinNumber.Should().Be(85);
 		map.Restart.JoinNumber.Should().Be(86);
+		map.Privacy.JoinNumber.Should().Be(89, "privacy is the 29th digital join of camera 3's block");
 		map.PresetSave.JoinNumber.Should().Be(3, "Preset_Save is analog join 3 for camera 3");
 		map.Host.JoinNumber.Should().Be(3, "IPAddress$ is serial join 3");
 		map.Password.JoinNumber.Should().Be(153);

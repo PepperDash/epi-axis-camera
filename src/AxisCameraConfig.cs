@@ -145,6 +145,15 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 		public string PreviewResolution { get; set; }
 
 		/// <summary>
+		/// When true (default), turning privacy on for this camera hides its video everywhere: the preview URL sent to SIMPL
+		/// is cleared and every decoder that is showing this camera is blanked, and both come back when privacy ends.
+		/// The camera moving to its privacy preset is done by whatever sends the preset recall, as before.
+		/// False makes privacy only a state that is reported
+		/// </summary>
+		[JsonProperty("privacyClearsStream")]
+		public bool? PrivacyClearsStream { get; set; }
+
+		/// <summary>
 		/// Poll interval in milliseconds. Defaults to 30000. A negative value polls once at startup only
 		/// </summary>
 		[JsonProperty("pollTimeMs")]

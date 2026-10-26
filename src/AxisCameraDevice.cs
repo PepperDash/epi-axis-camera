@@ -35,6 +35,16 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 		/// Camera password, or empty
 		/// </summary>
 		string Password { get; }
+
+		/// <summary>
+		/// True while the camera is in privacy and its video must be hidden everywhere (privacyClearsStream)
+		/// </summary>
+		bool PrivacyHidesVideo { get; }
+
+		/// <summary>
+		/// Raised when PrivacyHidesVideo changes
+		/// </summary>
+		event EventHandler PrivacyChanged;
 	}
 
 	/// <summary>
@@ -69,6 +79,7 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 		private bool? autoFocus;
 		private bool? autoIris;
 		private bool presetStored;
+		private bool privacyOn;
 		private string lastError = string.Empty;
 		private bool errorLogged;
 
@@ -110,11 +121,33 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 		public StringFeedback PreviewUrlFeedback { get; private set; }
 
 		/// <summary>
-		/// The preview URL: rtsp://host + streamPath at previewResolution
+		/// Privacy is on for this camera
+		/// </summary>
+		public BoolFeedback PrivacyOnFeedback { get; private set; }
+
+		/// <summary>
+		/// True while privacy is on and privacyClearsStream (the default) says its video is hidden everywhere
+		/// </summary>
+		public bool PrivacyHidesVideo
+		{
+			get { return privacyOn && (config.PrivacyClearsStream ?? true); }
+		}
+
+		/// <summary>
+		/// Raised when PrivacyHidesVideo changes
+		/// </summary>
+		public event EventHandler PrivacyChanged;
+
+		/// <summary>
+		/// The preview URL: rtsp://host + streamPath at previewResolution. Empty while privacy hides the camera's video
 		/// </summary>
 		public string PreviewUrl
 		{
-			get { return AxisStreamUrl.ForCamera(Host, StreamPath, string.IsNullOrWhiteSpace(config.PreviewResolution) ? "800x450" : config.PreviewResolution); }
+			get
+			{
+				return AxisPrivacy.PreviewUrl(Host, StreamPath,
+					string.IsNullOrWhiteSpace(config.PreviewResolution) ? "800x450" : config.PreviewResolution, PrivacyHidesVideo);
+			}
 		}
 
 		/// <summary>
@@ -206,6 +239,7 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 			PresetStoredFeedback = new BoolFeedback("presetStored", () => presetStored);
 			LastErrorFeedback = new StringFeedback("lastError", () => lastError);
 			PreviewUrlFeedback = new StringFeedback("previewUrl", () => PreviewUrl);
+			PrivacyOnFeedback = new BoolFeedback("privacyOn", () => privacyOn);
 
 			RebuildClient();
 
@@ -642,6 +676,31 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 		}
 
 		/// <summary>
+		/// Turns privacy on or off for this camera. With privacyClearsStream (the default) the preview URL sent to SIMPL is
+		/// cleared and every decoder showing this camera is blanked while privacy is on. The camera's privacy preset is not
+		/// recalled here: that is done by whatever sends the preset recall. Also for DEVJSON testing
+		/// </summary>
+		/// <param name="on">True for privacy on</param>
+		public void SetPrivacy(bool on)
+		{
+			if (privacyOn == on) return;
+
+			var wasHiding = PrivacyHidesVideo;
+			privacyOn = on;
+
+			this.LogInformation("Privacy is now {state}. Video is {video}", on ? "on" : "off", PrivacyHidesVideo ? "hidden" : "shown");
+
+			PrivacyOnFeedback.FireUpdate();
+
+			if (wasHiding == PrivacyHidesVideo) return;
+
+			PreviewUrlFeedback.FireUpdate();
+
+			var changed = PrivacyChanged;
+			if (changed != null) changed(this, EventArgs.Empty);
+		}
+
+		/// <summary>
 		/// Moves to the home position
 		/// </summary>
 		public void PositionHome()
@@ -784,10 +843,10 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 			var connection = CurrentConnection();
 
 			this.LogInformation(
-				"Status: host={host}:{port} login={login} online={online} autoFocus={af} autoIris={ai} lastError={error} previewUrl={url}",
+				"Status: host={host}:{port} login={login} online={online} autoFocus={af} autoIris={ai} privacy={privacy} lastError={error} previewUrl={url}",
 				connection.IsUsable ? connection.Host : "(none)", connection.EffectivePort,
 				string.IsNullOrEmpty(connection.Username) ? "(none)" : connection.Username,
-				online, autoFocus, autoIris, lastError, PreviewUrl);
+				online, autoFocus, autoIris, privacyOn, lastError, PreviewUrl);
 		}
 
 		/// <summary>
@@ -873,6 +932,7 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 			trilist.SetSigTrueAction(joinMap.AutoIris.JoinNumber, ToggleAutoIris);
 			trilist.SetSigTrueAction(joinMap.Restart.JoinNumber, Restart);
 			trilist.SetSigTrueAction(joinMap.Home.JoinNumber, PositionHome);
+			trilist.SetBoolSigAction(joinMap.Privacy.JoinNumber, SetPrivacy);
 
 			for (var i = 0; i < 8 && i < presetCount; i++)
 			{
@@ -904,6 +964,7 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 			PresetStoredFeedback.LinkInputSig(trilist.BooleanInput[joinMap.PresetStored.JoinNumber]);
 			LastErrorFeedback.LinkInputSig(trilist.StringInput[joinMap.LastError.JoinNumber]);
 			PreviewUrlFeedback.LinkInputSig(trilist.StringInput[joinMap.PreviewUrl.JoinNumber]);
+			PrivacyOnFeedback.LinkInputSig(trilist.BooleanInput[joinMap.Privacy.JoinNumber]);
 
 			this.LogInformation("Sending SIMPL the camera name on serial join {name} and the preview URL on serial join {url}",
 				joinMap.DeviceName.JoinNumber, joinMap.PreviewUrl.JoinNumber);
@@ -936,6 +997,7 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 			PresetStoredFeedback.FireUpdate();
 			LastErrorFeedback.FireUpdate();
 			PreviewUrlFeedback.FireUpdate();
+			PrivacyOnFeedback.FireUpdate();
 		}
 
 		#endregion

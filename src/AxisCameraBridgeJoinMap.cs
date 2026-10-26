@@ -85,6 +85,9 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 		[JoinName("IsOnline")]
 		public JoinDataComplete IsOnline = Digital(28, 1, "Camera answered the last request", eJoinCapabilities.ToSIMPL);
 
+		[JoinName("Privacy")]
+		public JoinDataComplete Privacy = Digital(29, 1, "Held high while the camera is in privacy. With privacyClearsStream the preview URL is cleared and decoders showing this camera are blanked. Feedback is the state", eJoinCapabilities.ToFromSIMPL);
+
 		#endregion
 
 		#region Analog
@@ -156,7 +159,7 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 			foreach (var join in new[]
 			{
 				Up, Down, Left, Right, UpRight, DownRight, UpLeft, DownLeft, ZoomIn, ZoomOut, FocusFar, FocusNear,
-				AutoFocus, IrisOpen, IrisClose, AutoIris, PresetRecall, PresetStored, Restart, Home, IsOnline
+				AutoFocus, IrisOpen, IrisClose, AutoIris, PresetRecall, PresetStored, Restart, Home, IsOnline, Privacy
 			})
 			{
 				join.JoinNumber = join.JoinNumber - JoinOffset + shift;
