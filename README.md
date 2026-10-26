@@ -339,6 +339,15 @@ Unit tests (`tests/`) cover the VAPIX requests and answers, the join layouts, th
 * **Camera:** continuous moves start when a join goes high and stop when it goes low. Requests are queued and sent one at a time in the order they were made, so a stop never overtakes the move it belongs to.
 * **Decoder:** the Decoder API has no "select input" command. Selecting a stream sends a complete view configuration (one full screen pane showing one stream), which replaces what the decoder was showing. The decoder keeps its configuration across a restart. Commands are queued, so a poll never overlaps a select.
 
+## Upgrading from the 1.0.0-rc plugin
+
+Version 3 is a rewrite and is not compatible with the 1.0.0-rc releases of this repository (a .NET 3.5 plugin for Essentials 1.x). It needs Essentials 3.0.0 or later on a CP4N. The device type is still `axisCamera`, but:
+
+* **Configuration:** `host` replaces `hostname`, `presets` is an object keyed by preset number (not a list), and the `communicationMonitor` block is gone (use `pollTimeMs`).
+* **Joins:** the join layout is new (see [Bridge joins](#bridge-joins)). Programs written for the old plugin must be rewired.
+* **Presets:** saving a preset works. In the old plugin it never did.
+* **Removed:** the power and privacy joins, which the old plugin never implemented.
+
 ## Not yet verified on hardware
 
 * Which VAPIX PTZ commands the M5526-E accepts (iris and auto iris in particular), and whether saving presets works through `ptzconfig.cgi` on its firmware.
