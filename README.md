@@ -477,3 +477,347 @@ A nuget package is automatically generated when the plugin is build. To modify t
 1. `PackageId` - This is the name that will be used to pull the package from Nuget once it's published
 2. `PackageProjectUrl` - This should match the URL for the plugin repo
 3. `AssemblyTitle` - This is the dll file name that is will show on a processor when the plugin is loaded
+<!-- START Minimum Essentials Framework Versions -->
+### Minimum Essentials Framework Versions
+
+- 3.0.0
+- 3.0.0
+<!-- END Minimum Essentials Framework Versions -->
+<!-- START Config Example -->
+### Config Example
+
+```json
+{
+    "key": "GeneratedKey",
+    "uid": 1,
+    "name": "GeneratedName",
+    "type": "axisD1110",
+    "group": "Group",
+    "properties": {
+        "connectionSource": "SampleString",
+        "IsBridgeSource": true,
+        "joinLayout": "SampleString",
+        "IsIndexedLayout": true,
+        "cameraIndex": 0,
+        "panSpeed": 0,
+        "tiltSpeed": 0,
+        "zoomSpeed": 0,
+        "focusSpeed": 0,
+        "irisSpeed": 0,
+        "presetMode": "SampleString",
+        "UseServerPresets": true,
+        "presetCount": 0,
+        "presets": {
+            "SampleString": "SampleString"
+        },
+        "streamPath": "SampleString",
+        "previewResolution": "SampleString",
+        "privacyClearsStream": true,
+        "pollTimeMs": 0
+    }
+}
+```
+<!-- END Config Example -->
+<!-- START Supported Types -->
+### Supported Types
+
+- axisD1110
+- axisCamera
+<!-- END Supported Types -->
+<!-- START Join Maps -->
+### Join Maps
+
+#### Digitals
+
+| Join | Type (RW) | Description |
+| --- | --- | --- |
+| 1 | R | Decoder is online |
+| 2 | R | Pulse to blank the decoder output (stream 0) |
+| 3 | R | Pulse to poll the decoder now |
+
+#### Analogs
+
+| Join | Type (RW) | Description |
+| --- | --- | --- |
+| 1 | R | Stream to show (1-64, 0 = blank) and selected stream feedback |
+| 2 | R | Last Decoder API error code (0 = none) |
+| 3 | R | Second stream, shown side by side with the first (0 = none) |
+| 1 | R | Set to a preset number to save the current position as that preset |
+
+#### Serials
+
+| Join | Type (RW) | Description |
+| --- | --- | --- |
+| 1 | R | Device name |
+| 2 | R | Name of the selected stream |
+| 3 | R | Last Decoder API error message |
+| 4 | R | Decoder view configuration id |
+| 31 | R | Stream RTSP URLs for streams 1-16, in stream number order. Used when streamSource is bridge |
+| 11 | R | Configured stream names for streams 1-16, in stream number order |
+<!-- END Join Maps -->
+<!-- START Interfaces Implemented -->
+### Interfaces Implemented
+
+- IAxisCameraSource
+- IHasCameraPtzControl
+- IHasCameraFocusControl
+- IHasAutoFocusMode
+- IHasCameraPresets
+- IDisposable
+<!-- END Interfaces Implemented -->
+<!-- START Base Classes -->
+### Base Classes
+
+- AxisHttpConfig
+- EssentialsBridgeableDevice
+- JoinMapBaseAdvanced
+<!-- END Base Classes -->
+<!-- START Public Methods -->
+### Public Methods
+
+- public AxisStreamUrl WithResolution(string resolution)
+- public string ToUrl()
+- public string ToMaskedUrl()
+- public void SetBridgeHost(string host)
+- public void SetBridgePort(string port)
+- public void SetBridgeUsername(string username)
+- public void SetBridgePassword(string password)
+- public void Poll()
+- public void TiltUp()
+- public void TiltDown()
+- public void PanLeft()
+- public void PanRight()
+- public void MoveUpRight()
+- public void MoveDownRight()
+- public void MoveUpLeft()
+- public void MoveDownLeft()
+- public void PanStop()
+- public void TiltStop()
+- public void StopPanTilt()
+- public void ZoomIn()
+- public void ZoomOut()
+- public void ZoomStop()
+- public void FocusNear()
+- public void FocusFar()
+- public void FocusStop()
+- public void TriggerAutoFocus()
+- public void SetFocusModeAuto()
+- public void SetFocusModeManual()
+- public void ToggleFocusMode()
+- public void IrisOpen()
+- public void IrisClose()
+- public void IrisStop()
+- public void ToggleAutoIris()
+- public void SetPrivacy(bool on)
+- public void PositionHome()
+- public void Restart()
+- public void PresetSelect(int preset)
+- public void PresetStore(int preset, string description)
+- public void PresetStore(int preset)
+- public void PrintStatus()
+- public void SendRequest(string pathAndQuery)
+- public Uri BuildUri(string pathAndQuery)
+- public bool SameAs(AxisConnection other)
+- public string Describe()
+- public AxisHttpResult Get(string label, string pathAndQuery)
+- public AxisHttpResult PostJson(string label, string pathAndQuery, string json)
+- public void Dispose()
+- public AxisD1110Result GetViewConfiguration()
+- public AxisD1110Result SetViewConfiguration(AxisD1110StreamConfig stream)
+- public AxisD1110Result SetViewConfiguration(IList<AxisD1110StreamConfig> streams)
+- public AxisD1110Result Send(string method, JObject parameters)
+- public void Dispose()
+- public void SelectStream(int stream)
+- public void SelectStream2(int stream)
+- public void Clear()
+- public void Poll()
+- public void SelectStreamByName(string name)
+- public void PrintStatus()
+- public void SetBridgeStreamUrl(int number, string url)
+- public void SendRequest(string method, string paramsJson)
+- public AxisConnection ToConnection()
+- public void Contiguous_IsUnchanged()
+- public void Contiguous_SecondStreamIsAnalogThree()
+- public void Contiguous_StreamNameAndUrlJoinsStaySixteenWideAndDoNotOverlap()
+- public void Indexed_PutsEachDecoderInItsOwnJoins(int decoder)
+- public void Indexed_EightDecodersFitInThirtyTwoJoinsOfEachTypeWithoutOverlap()
+- public void IndexOutOfRange_UsesTheContiguousLayout(int index)
+- public void Indexed_DecoderEightSecondStreamIsAnalog24()
+- public void ThereAreExamples()
+- public void EveryDeviceIsReadableByThePluginAndComplete(string file)
+- public void EveryAxisDeviceIsOnAnEiscWithoutOverlappingJoins(string file)
+- public void ConfigMode_UsesTheConfiguredUrlAndMovesTheLoginOutOfIt()
+- public void ConfigMode_IgnoresAUrlFromTheBridge()
+- public void BridgeMode_UsesTheBridgeUrlEvenWithoutAStreamEntry()
+- public void BridgeMode_IgnoresTheConfiguredUrl()
+- public void BridgeMode_StillTakesNameAndCodecFromTheStreamEntry()
+- public void BridgeMode_NoUrlYetIsAnError()
+- public void ConfigMode_NoUrlIsAnError()
+- public void NotAUrl_IsAnErrorThatNamesTheText()
+- public void ResolutionOverride_ReplacesThePreviewResolution()
+- public void ResolutionOverride_PerStreamBeatsPluginLevel()
+- public void NoResolutionOverride_LeavesTheUrlAsReceived()
+- public void Login_StreamEntryBeatsTheUrl()
+- public void Login_UrlBeatsThePluginDefault()
+- public void Login_PluginDefaultIsUsedWhenTheUrlHasNone()
+- public void Login_NoneAnywhereLeavesItEmpty()
+- public void Login_PasswordNeverComesFromADifferentSourceThanTheLogin()
+- public void SentUrl_NeverContainsALogin()
+- public void Camera_StreamIsBuiltFromTheCamerasAddressAndLogin()
+- public void Camera_BeatsAConfiguredUrlAndABridgeUrl()
+- public void Camera_StreamPathCanBeChanged(string path, string expected)
+- public void Camera_UsesTheCamerasStreamPathUnlessTheDecoderSetsOne()
+- public void Camera_NotFoundNamesTheKey()
+- public void Camera_WithoutAnAddressYetIsAnError(string host)
+- public void Camera_LoginPrecedence()
+- public void Camera_SentUrlNeverContainsTheLogin()
+- public void Config_ReadsAFullPropertiesObject()
+- public void Config_PrivacyClearsStreamIsOnUnlessSetOff()
+- public void Config_MinimalPropertiesUseDefaults()
+- public void PresetMode_DefaultsToServer(string mode, bool expectedServer)
+- public void ToConnection_CarriesTheSharedProperties()
+- public void Connection_FillsInTheDefaultPort(string host, int port, bool https, int expected)
+- public void Connection_BuildsUrlsAndComparesConnections()
+- public void Resolve_ZeroIsAnEmptyPane()
+- public void Resolve_AStreamHiddenByPrivacyIsLeftOutWithoutBuildingIt()
+- public void Resolve_AStreamThatCannotBeBuiltIsUnavailableWithTheReason()
+- public void Resolve_ABuiltStreamIsShown()
+- public void Visible_KeepsPaneOrder()
+- public void Visible_LeavesOutEmptyHiddenAndUnavailablePanes(
+		int first, bool firstHidden, bool firstBuilds, int second, bool secondHidden, bool secondBuilds, int expected)
+- public void OnlyTheSecondPaneLeft_IsShownFullScreen()
+- public void BothPanesHiddenByPrivacy_BlanksTheOutput()
+- public void TwoPanes_IsTheDecoderPaneCount()
+- public void BuildViewConfiguration_ShowsOneStreamFullScreen()
+- public void BuildViewConfiguration_DefaultsToH264WithNoAudioOrCredentials()
+- public void BuildViewConfiguration_NullStreamSendsAnEmptyConfiguration()
+- public void BuildViewConfiguration_ListOfOneIsTheSameAsOneStream()
+- public void BuildViewConfiguration_NullEntriesAreLeftOut()
+- public void BuildViewConfiguration_NoStreamsSendsAnEmptyConfiguration()
+- public void BuildViewConfiguration_TwoStreamsAreSideBySideIn16By9Panes()
+- public void BuildViewConfiguration_MoreThanTwoStreamsIsRejected()
+- public void MaskSecrets_HidesEveryPassword()
+- public void MaskSecrets_LeavesTextWithoutPasswordsAlone(string body)
+- public void MaskUrl_HidesThePasswordInTheUrl(string url, string expected)
+- public void Contiguous_FollowsTheJoinStart()
+- public void IndexedCameraOne_MatchesTheContiguousDigitalJoins()
+- public void Indexed_DigitalJoinsAreInBlocksOf30(int camera, uint firstJoin)
+- public void Indexed_AnalogAndSerialJoinsFollowTheCameraNumber(int camera)
+- public void Indexed_SerialJoinsToSimplStayWithinWhatTheMainProgramReads()
+- public void Indexed_ToSimplSerialJoinsDoNotOverlapAcrossAllFortyOneCameras()
+- public void Indexed_NoCameraShareADigitalJoinAcrossAllFortyOne()
+- public void Indexed_MatchesTheLayoutTheMainProgramAlreadyUses()
+- public void IndexZeroOrLess_UsesTheContiguousLayout()
+- public void PreviewUrl_IsTheUrlWhenPrivacyIsOff()
+- public void PreviewUrl_IsEmptyWhilePrivacyHidesTheVideo(string host)
+- public void PreviewUrl_ComesBackWhenPrivacyEnds()
+- public void Plan_DecidesWhatADecoderShowingTheCameraDoes(bool cameraHidesVideo, bool blankedByPrivacy, AxisPrivacyAction expected)
+- public void Plan_FollowsAFullPrivacyCycle()
+- public void PanesNeedApply_WhenEitherPaneChanges(bool hides1, bool blanked1, bool hides2, bool blanked2, bool expected)
+- public void Config_ReadsAFullPropertiesObject()
+- public void Config_ReadsTheStreamSourceResolutionAndLogin()
+- public void Config_StreamSourceDefaultsToConfig(string source, bool expectedBridge)
+- public void Config_SelectOnlyConfiguredStreamsDefaultsToOff()
+- public void Config_ReadsTheJoinLayoutAndDecoderIndex()
+- public void Config_MinimalPropertiesUseDefaults()
+- public void GetViewConfiguration_PostsTheMethodToDecoderCgi()
+- public void SetViewConfiguration_SendsTheStreamAsParams()
+- public void BasicMode_SendsTheAuthorizationHeaderOnTheFirstRequest()
+- public void DigestMode_AnswersADigestChallenge()
+- public void WrongCredentials_ReportTheHttpStatus()
+- public void DecoderErrors_ComeBackThroughTheResult()
+- public void NothingListening_ReportsATransportError()
+- public void SlowDecoder_TimesOutInsteadOfHanging()
+- public void Send_PassesAnyMethodAndParamsThrough()
+- public void Logging_RecordsEachRequestAndResponse_WithoutPasswords()
+- public void Logging_RecordsATransportFailure()
+- public void ParseResponse_DataMeansSuccess()
+- public void ParseResponse_ErrorsWithoutDataIsAFailure()
+- public void ParseResponse_StreamErrorWithDataStillAppliesTheConfiguration()
+- public void ParseResponse_ReportsFirstErrorOnly()
+- public void ParseResponse_ConfigurationChangedCodeIsPassedThrough()
+- public void ParseResponse_UnreadableBodyIsATransportError(string body)
+- public void ParseResponse_NeitherDataNorErrorsIsAFailure()
+- public void Get_SendsThePathAndQuery_AndASuccessHasNoBody()
+- public void Get_AnErrorBodyOn200IsRecognizedAsAnError()
+- public void Get_ReadsAPositionAnswer()
+- public void Get_AnswersADigestChallenge()
+- public void Get_BasicModeSendsTheHeaderFirstTime()
+- public void Get_WrongPasswordIsAnHttpError()
+- public void Get_LogsTheRequestAndTheAnswer()
+- public void Get_NothingListeningIsReportedWithoutThrowing()
+- public void Parse_SplitsAUrlWithLogin()
+- public void Parse_UrlWithoutLoginHasEmptyCredentials()
+- public void Parse_KeepsThePort()
+- public void Parse_PasswordMayContainAtSignsAndColons()
+- public void Parse_DecodesPercentEncodedCredentials()
+- public void Parse_LoginWithoutPasswordIsAllowed()
+- public void Parse_UrlWithOnlyAHostHasNoPathOrQuery()
+- public void Parse_RejectsTextThatIsNotAStreamUrl(string text)
+- public void ToUrl_LeavesTheLoginOut()
+- public void ToMaskedUrl_ShowsTheLoginButNotThePassword()
+- public void WithResolution_ReplacesOrAddsTheResolutionParameter(string input, string expected)
+- public void WithResolution_EmptyResolutionLeavesTheUrlAsReceived(string resolution)
+- public void ForCamera_BuildsTheCameraStreamUrl(string host, string path, string resolution, string expected)
+- public void ForCamera_NoHostYetGivesAnEmptyUrl(string host)
+- public void WithResolution_KeepsTheLogin()
+- public record RecordedRequest(string Method, string Path, string ContentType, string Authorization, string Body, string Query = "")
+- public void Dispose()
+- public void PanTilt_UsesContinuousMove(int pan, int tilt, string expected)
+- public void StopPanTilt_SendsZeroZero()
+- public void ZoomFocusIris_UseTheirContinuousMoves()
+- public void HomeAutoFocusAutoIrisAndQuery()
+- public void PresetName_IsTwoDigitsAtLeast(int number, string expected)
+- public void GotoPreset_ServerUsesTheNameDeviceUsesTheNumber()
+- public void SetPreset_ServerUsesTheNameAndOnlyPresetOneBecomesHome()
+- public void SetPreset_CanUsePtzCgiLikeTheOldControlProgram()
+- public void SetPreset_DeviceUsesTheNumber()
+- public void ClampSpeed_KeepsSpeedsInTheCameraRange(int speed, int expected)
+- public void NoContent_IsSuccess()
+- public void Ok_WithAPositionBody_IsSuccess()
+- public void Ok_WithAnErrorBody_IsAnErrorEvenThoughTheStatusIs200(string body, string expected)
+- public void ErrorBodyWithNoText_StillReportsSomething()
+- public void HttpFailureStatuses_AreErrors(int status)
+- public void NoResponse_IsAnErrorWithTheExceptionMessage()
+- public void Parse_ReadsAnswerWithSeparateLines()
+- public void Parse_ReadsAnswerWithRunTogetherValues()
+- public void Parse_ValuesTheCameraDidNotReportAreNull()
+- public void Parse_NothingUsefulGivesAllNulls(string body)
+- public void Parse_AutoFocusIsNotConfusedWithOtherKeys()
+- public void Parse_IsNotCaseSensitive()
+- public void Default_ActsOnEveryValue(int value)
+- public void OnlyConfigured_ActsOnConfiguredStreams(int value)
+- public void OnlyConfigured_IgnoresEverythingElse(int value)
+- public void StreamNumbersGoUpTo64()
+- public void IsStreamNumber_Is1To64(int number, bool expected)
+- public void TryParseStreamKey_AcceptsCameraNumbers(string key, int expected)
+- public void TryParseStreamKey_RejectsAnythingElse(string key)
+- public void OnlyConfigured_StreamsAbove16CanBeSelected()
+- public void OnlyConfigured_StreamsThatSkipANumberAreRespected()
+<!-- END Public Methods -->
+<!-- START Bool Feedbacks -->
+### Bool Feedbacks
+
+- OnlineFeedback
+- AutoFocusFeedback
+- AutoIrisFeedback
+- PresetStoredFeedback
+- PrivacyOnFeedback
+- OnlineFeedback
+<!-- END Bool Feedbacks -->
+<!-- START Int Feedbacks -->
+### Int Feedbacks
+
+- SelectedStreamFeedback
+- SelectedStream2Feedback
+- LastErrorCodeFeedback
+<!-- END Int Feedbacks -->
+<!-- START String Feedbacks -->
+### String Feedbacks
+
+- LastErrorFeedback
+- PreviewUrlFeedback
+- SelectedStreamNameFeedback
+- LastErrorFeedback
+- ConfigurationIdFeedback
+<!-- END String Feedbacks -->
