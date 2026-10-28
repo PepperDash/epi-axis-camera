@@ -9,7 +9,7 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 	/// Contiguous layout (default): every join is an offset from the joinStart of the bridge entry.
 	///
 	/// Indexed layout, for one small EISC shared by up to 8 decoders (decoder n, n starting at 1, use joinStart 1):
-	/// digital online n, clear 8+n, refresh 16+n. Analog select stream n, last error code 8+n.
+	/// digital online n, clear 8+n, refresh 16+n. Analog select stream n, last error code 8+n, select stream 2 16+n.
 	/// Serial device name n, selected stream name 8+n, last error 16+n, configuration id 24+n.
 	/// The stream names and stream URLs joins are not used. Everything fits in 32 joins of each type.
 	/// </remarks>
@@ -19,6 +19,12 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 		/// Most decoders the indexed layout can hold
 		/// </summary>
 		public const int MaxIndexedDecoders = 8;
+
+		/// <summary>
+		/// Streams that have a stream name join and a stream URL join in the contiguous layout (streams 1 to 16).
+		/// Higher stream numbers can still be selected, they just have no name or URL join
+		/// </summary>
+		public const int MaxBridgeStreams = 16;
 
 		#region Digital
 
@@ -61,7 +67,7 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 			new JoinData { JoinNumber = 1, JoinSpan = 1 },
 			new JoinMetadata
 			{
-				Description = "Stream to show (1-16, 0 = blank) and selected stream feedback",
+				Description = "Stream to show (1-64, 0 = blank) and selected stream feedback",
 				JoinCapabilities = eJoinCapabilities.ToFromSIMPL,
 				JoinType = eJoinType.Analog
 			});
@@ -73,6 +79,16 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 			{
 				Description = "Last Decoder API error code (0 = none)",
 				JoinCapabilities = eJoinCapabilities.ToSIMPL,
+				JoinType = eJoinType.Analog
+			});
+
+		[JoinName("SelectStream2")]
+		public JoinDataComplete SelectStream2 = new JoinDataComplete(
+			new JoinData { JoinNumber = 3, JoinSpan = 1 },
+			new JoinMetadata
+			{
+				Description = "Second stream, shown side by side with the first (0 = none)",
+				JoinCapabilities = eJoinCapabilities.ToFromSIMPL,
 				JoinType = eJoinType.Analog
 			});
 
@@ -122,20 +138,20 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 
 		[JoinName("StreamUrls")]
 		public JoinDataComplete StreamUrls = new JoinDataComplete(
-			new JoinData { JoinNumber = 31, JoinSpan = 16 },
+			new JoinData { JoinNumber = 31, JoinSpan = MaxBridgeStreams },
 			new JoinMetadata
 			{
-				Description = "Stream RTSP URLs, in stream number order. Used when streamSource is bridge",
+				Description = "Stream RTSP URLs for streams 1-16, in stream number order. Used when streamSource is bridge",
 				JoinCapabilities = eJoinCapabilities.FromSIMPL,
 				JoinType = eJoinType.Serial
 			});
 
 		[JoinName("StreamNames")]
 		public JoinDataComplete StreamNames = new JoinDataComplete(
-			new JoinData { JoinNumber = 11, JoinSpan = 16 },
+			new JoinData { JoinNumber = 11, JoinSpan = MaxBridgeStreams },
 			new JoinMetadata
 			{
-				Description = "Configured stream names, in stream number order",
+				Description = "Configured stream names for streams 1-16, in stream number order",
 				JoinCapabilities = eJoinCapabilities.ToSIMPL,
 				JoinType = eJoinType.Serial
 			});
@@ -174,6 +190,7 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 
 			SelectStream.JoinNumber = index;
 			LastErrorCode.JoinNumber = 8 + index;
+			SelectStream2.JoinNumber = 16 + index;
 
 			DeviceName.JoinNumber = index;
 			SelectedStreamName.JoinNumber = 8 + index;

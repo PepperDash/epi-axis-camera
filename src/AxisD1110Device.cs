@@ -15,19 +15,26 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 	/// Axis D1110 video decoder. Tells the decoder which camera stream to show through the VAPIX Decoder API
 	/// </summary>
 	/// <remarks>
-	/// The decoder has no "select input" command. Selecting a stream sends a complete view configuration
-	/// (one full screen pane showing one stream), which replaces whatever the decoder was showing.
-	/// The decoder does not report which stream it is showing, so the selected stream feedback is the last
-	/// stream this device sent. A change in the decoder's configuration id that this device did not cause
-	/// clears the feedback.
+	/// The decoder has no "select input" command. Selecting a stream sends a complete view configuration,
+	/// which replaces whatever the decoder was showing. The decoder is driven with two panes, like a quad
+	/// multiviewer following two touch panel video windows: one stream is shown full screen, two are shown
+	/// side by side, none blanks the output. Selecting on either pane sends both again.
+	/// The decoder does not report which stream it is showing, so the selected stream feedbacks are the last
+	/// streams this device sent. A change in the decoder's configuration id that this device did not cause
+	/// clears the feedbacks.
 	/// </remarks>
 	public class AxisD1110Device : EssentialsBridgeableDevice
 	{
 		private const long DefaultPollTimeMs = 30000;
-		private const int MaxStreams = 16;
+		private const int MaxStreams = AxisD1110Select.MaxStreams;
+		private const int MaxBridgeStreams = AxisD1110BridgeJoinMap.MaxBridgeStreams;
+		private const int PaneCount = AxisD1110Layout.PaneCount;
 		private const int DecoderConfigurationChangedCode = 100;
 
 		private const string SelectPrefix = "select:";
+		private const string Select2Prefix = "select2:";
+		private const string ClearCommand = "clear";
+		private const string ApplyCommand = "apply";
 		private const string PollCommand = "poll";
 		private const string PrivacyCommand = "privacy";
 
@@ -37,11 +44,13 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 		private readonly Dictionary<int, AxisD1110StreamConfig> streams = new Dictionary<int, AxisD1110StreamConfig>();
 		private readonly Dictionary<int, string> bridgeUrls = new Dictionary<int, string>();
 
+		// per pane: the stream last sent (0 = none), and whether the pane was left out because its camera is in privacy
+		private readonly int[] selectedStreams = new int[PaneCount];
+		private readonly bool[] paneBlankedByPrivacy = new bool[PaneCount];
+
 		private CTimer pollTimer;
 		private bool online;
-		private int selectedStream;
 		private bool selectionMade;
-		private bool blankedByPrivacy;
 		private string configurationId = string.Empty;
 		private int lastErrorCode;
 		private string lastError = string.Empty;
@@ -53,12 +62,17 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 		public BoolFeedback OnlineFeedback { get; private set; }
 
 		/// <summary>
-		/// Stream last sent to the decoder (1 to 16). 0 means blank or unknown
+		/// Stream last sent to the decoder for the first pane (1 to 64). 0 means none or unknown
 		/// </summary>
 		public IntFeedback SelectedStreamFeedback { get; private set; }
 
 		/// <summary>
-		/// Name of the selected stream
+		/// Stream last sent to the decoder for the second pane, shown side by side with the first (1 to 64). 0 means none or unknown
+		/// </summary>
+		public IntFeedback SelectedStream2Feedback { get; private set; }
+
+		/// <summary>
+		/// Name of the selected stream (first pane)
 		/// </summary>
 		public StringFeedback SelectedStreamNameFeedback { get; private set; }
 
@@ -93,7 +107,7 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 			foreach (var pair in config.Streams)
 			{
 				int number;
-				if (!int.TryParse(pair.Key, out number) || number < 1 || number > MaxStreams)
+				if (!AxisD1110Select.TryParseStreamKey(pair.Key, out number))
 				{
 					this.LogWarning("Ignoring stream key {key}. Stream keys must be numbers from 1 to {max}", pair.Key, MaxStreams);
 					continue;
@@ -118,8 +132,9 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 				config.PollTimeMs == 0 ? DefaultPollTimeMs : config.PollTimeMs);
 
 			OnlineFeedback = new BoolFeedback("online", () => online);
-			SelectedStreamFeedback = new IntFeedback("selectedStream", () => selectedStream);
-			SelectedStreamNameFeedback = new StringFeedback("selectedStreamName", () => StreamName(selectedStream));
+			SelectedStreamFeedback = new IntFeedback("selectedStream", () => selectedStreams[0]);
+			SelectedStream2Feedback = new IntFeedback("selectedStream2", () => selectedStreams[1]);
+			SelectedStreamNameFeedback = new StringFeedback("selectedStreamName", () => StreamName(selectedStreams[0]));
 			LastErrorCodeFeedback = new IntFeedback("lastErrorCode", () => lastErrorCode);
 			LastErrorFeedback = new StringFeedback("lastError", () => lastError);
 			ConfigurationIdFeedback = new StringFeedback("configurationId", () => configurationId);
@@ -129,9 +144,10 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 		}
 
 		/// <summary>
-		/// Shows a configured stream on the decoder
+		/// Shows a configured stream in the first pane. With a second stream selected the two are shown side by side,
+		/// otherwise this one is full screen
 		/// </summary>
-		/// <param name="stream">Stream number (1 to 16). 0 blanks the output</param>
+		/// <param name="stream">Stream number (1 to 64). 0 empties the first pane (blanks the output when the second is empty too)</param>
 		public void SelectStream(int stream)
 		{
 			this.LogInformation("Select stream {stream} requested ({name})", stream, StreamName(stream));
@@ -139,11 +155,22 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 		}
 
 		/// <summary>
-		/// Blanks the decoder output
+		/// Shows a configured stream in the second pane, side by side with the first. Alone it is full screen
+		/// </summary>
+		/// <param name="stream">Stream number (1 to 64). 0 empties the second pane</param>
+		public void SelectStream2(int stream)
+		{
+			this.LogInformation("Select second stream {stream} requested ({name})", stream, StreamName(stream));
+			commandQueue.Enqueue(new ProcessStringMessage(Select2Prefix + stream, ProcessCommand));
+		}
+
+		/// <summary>
+		/// Empties both panes, which blanks the decoder output
 		/// </summary>
 		public void Clear()
 		{
-			SelectStream(0);
+			this.LogInformation("Clear requested");
+			commandQueue.Enqueue(new ProcessStringMessage(ClearCommand, ProcessCommand));
 		}
 
 		/// <summary>
@@ -179,8 +206,15 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 		public void PrintStatus()
 		{
 			this.LogInformation(
-				"Status: online={online} selectedStream={stream} ({name}) configurationId={id} lastError={code} {error} polling={polling}",
-				online, selectedStream, StreamName(selectedStream), configurationId, lastErrorCode, lastError, pollTimer != null);
+				"Status: online={online} selectedStream={stream} ({name}) selectedStream2={stream2} ({name2}) configurationId={id} lastError={code} {error} polling={polling}",
+				online, selectedStreams[0], StreamName(selectedStreams[0]), selectedStreams[1], StreamName(selectedStreams[1]),
+				configurationId, lastErrorCode, lastError, pollTimer != null);
+
+			for (var pane = 0; pane < PaneCount; pane++)
+			{
+				this.LogInformation("Pane {pane}: stream {stream} ({name}) hiddenByPrivacy={hidden}",
+					pane + 1, selectedStreams[pane], StreamName(selectedStreams[pane]), paneBlankedByPrivacy[pane]);
+			}
 
 			for (var number = 1; number <= MaxStreams; number++)
 			{
@@ -206,10 +240,10 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 		}
 
 		/// <summary>
-		/// Stores the URL SIMPL sent for a stream. Used when streamSource is bridge. If it is the stream on screen
-		/// and the URL changed, the new URL is sent to the decoder
+		/// Stores the URL SIMPL sent for a stream. Used when streamSource is bridge. If the stream is selected in either
+		/// pane and the URL changed, the layout is sent to the decoder again
 		/// </summary>
-		/// <param name="number">Stream number (1 to 16)</param>
+		/// <param name="number">Stream number (1 to 64). The bridge has URL joins for streams 1 to 16</param>
 		/// <param name="url">RTSP URL, may carry the login</param>
 		public void SetBridgeStreamUrl(int number, string url)
 		{
@@ -227,10 +261,10 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 
 			this.LogInformation("Bridge sent URL for stream {number}: {url}", number, string.IsNullOrEmpty(url) ? "(empty)" : AxisD1110DecoderClient.MaskUrl(url));
 
-			if (number == selectedStream)
+			if (Array.IndexOf(selectedStreams, number) >= 0)
 			{
 				this.LogInformation("Stream {number} is on screen and its URL changed, sending it again", number);
-				SelectStream(number);
+				commandQueue.Enqueue(new ProcessStringMessage(ApplyCommand, ProcessCommand));
 			}
 		}
 
@@ -261,7 +295,7 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 			}));
 		}
 
-		// the select join may be driven by something that also carries numbers that are not streams (a display's selected source)
+		// the select joins may be driven by something that also carries numbers that are not streams (a display's selected source)
 		private void OnSelectJoin(ushort value)
 		{
 			if (!AxisD1110Select.ShouldSelect(value, config.SelectOnlyConfiguredStreams, IsConfiguredStream))
@@ -271,6 +305,17 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 			}
 
 			SelectStream(value);
+		}
+
+		private void OnSelect2Join(ushort value)
+		{
+			if (!AxisD1110Select.ShouldSelect(value, config.SelectOnlyConfiguredStreams, IsConfiguredStream))
+			{
+				this.LogDebug("Ignoring second stream select value {value}: it is not a configured stream", value);
+				return;
+			}
+
+			SelectStream2(value);
 		}
 
 		private bool IsConfiguredStream(int number)
@@ -284,7 +329,7 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 			}
 		}
 
-		// privacy on a camera hides its video everywhere, so a decoder showing that camera blanks until privacy ends
+		// privacy on a camera hides its video everywhere, so a decoder pane showing that camera is left out until privacy ends
 		private void SubscribeToCameras()
 		{
 			var followed = new HashSet<string>();
@@ -312,20 +357,37 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 
 		private void ProcessPrivacy()
 		{
-			if (selectedStream < 1) return;
+			var hides = new bool[PaneCount];
+			for (var pane = 0; pane < PaneCount; pane++)
+			{
+				var camera = CameraOf(selectedStreams[pane]);
+				hides[pane] = camera != null && camera.PrivacyHidesVideo;
+			}
+
+			if (!AxisPrivacy.PanesNeedApply(hides, paneBlankedByPrivacy)) return;
+
+			for (var pane = 0; pane < PaneCount; pane++)
+			{
+				var action = AxisPrivacy.Plan(hides[pane], paneBlankedByPrivacy[pane]);
+				if (action == AxisPrivacyAction.None) continue;
+
+				this.LogInformation("Privacy changed on camera {key} (hides video: {hides}). Stream {number} in pane {pane}: {action}",
+					streams[selectedStreams[pane]].CameraKey, hides[pane], selectedStreams[pane], pane + 1, action);
+			}
+
+			// sending the layout again leaves out the panes whose camera is in privacy and brings back the ones whose privacy is over
+			ApplyPanes((int[])selectedStreams.Clone());
+		}
+
+		// the camera a stream names, or null when the stream has no cameraKey or the camera does not exist
+		private IAxisCameraSource CameraOf(int number)
+		{
+			if (number < 1) return null;
 
 			AxisD1110StreamConfig configured;
-			if (!streams.TryGetValue(selectedStream, out configured) || string.IsNullOrEmpty(configured.CameraKey)) return;
+			if (!streams.TryGetValue(number, out configured) || string.IsNullOrEmpty(configured.CameraKey)) return null;
 
-			var camera = DeviceManager.GetDeviceForKey(configured.CameraKey) as IAxisCameraSource;
-			if (camera == null) return;
-
-			var action = AxisPrivacy.Plan(camera.PrivacyHidesVideo, blankedByPrivacy);
-			this.LogInformation("Privacy changed on camera {key} (hides video: {hides}). Stream {number} on screen: {action}",
-				configured.CameraKey, camera.PrivacyHidesVideo, selectedStream, action);
-
-			// selecting the stream again either blanks the output (camera in privacy) or shows it (privacy over)
-			if (action != AxisPrivacyAction.None) ProcessSelect(selectedStream);
+			return DeviceManager.GetDeviceForKey(configured.CameraKey) as IAxisCameraSource;
 		}
 
 		private void StartPolling()
@@ -350,7 +412,20 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 				}
 				else if (command.StartsWith(SelectPrefix, StringComparison.Ordinal))
 				{
-					ProcessSelect(int.Parse(command.Substring(SelectPrefix.Length)));
+					ProcessSelect(0, int.Parse(command.Substring(SelectPrefix.Length)));
+				}
+				else if (command.StartsWith(Select2Prefix, StringComparison.Ordinal))
+				{
+					ProcessSelect(1, int.Parse(command.Substring(Select2Prefix.Length)));
+				}
+				else if (command == ClearCommand)
+				{
+					this.LogInformation("Blanking the decoder output");
+					ApplyPanes(new int[PaneCount]);
+				}
+				else if (command == ApplyCommand)
+				{
+					ApplyPanes((int[])selectedStreams.Clone());
 				}
 				else if (command == PrivacyCommand)
 				{
@@ -363,86 +438,113 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 			}
 		}
 
-		private void ProcessSelect(int number)
+		// pane is 0 for the first pane, 1 for the second. The other pane keeps its stream and both are sent
+		private void ProcessSelect(int pane, int number)
 		{
-			AxisD1110StreamConfig stream = null;
-			var hiddenByPrivacy = false;
-
-			if (number != 0)
+			if (number != 0 && !AxisD1110Select.IsStreamNumber(number))
 			{
-				AxisD1110StreamConfig configured;
-				streams.TryGetValue(number, out configured);
-
-				string bridgeUrl;
-				lock (bridgeUrls)
-				{
-					bridgeUrls.TryGetValue(number, out bridgeUrl);
-				}
-
-				string error = null;
-				if (number < 1 || number > MaxStreams)
-				{
-					error = "stream numbers are 1 to " + MaxStreams;
-				}
-				else
-				{
-					var camera = configured == null || string.IsNullOrEmpty(configured.CameraKey)
-						? null
-						: DeviceManager.GetDeviceForKey(configured.CameraKey) as IAxisCameraSource;
-
-					if (camera != null && camera.PrivacyHidesVideo)
-					{
-						hiddenByPrivacy = true;
-					}
-					else
-					{
-						AxisD1110StreamBuilder.TryBuild(config, configured, bridgeUrl, camera, out stream, out error);
-					}
-				}
-
-				if (stream == null && !hiddenByPrivacy)
-				{
-					this.LogWarning("Stream {number} cannot be used: {error}", number, error);
-					SetError(-3, string.Format("Stream {0}: {1}", number, error));
-					return;
-				}
-
-				if (hiddenByPrivacy)
-				{
-					this.LogInformation("Stream {number} ({name}) is hidden: camera {key} is in privacy. Blanking the decoder output",
-						number, StreamName(number), configured.CameraKey);
-				}
-				else
-				{
-					this.LogInformation("Selecting stream {number} {name}: {url} login={login} resolution={resolution}",
-						number, StreamName(number), stream.Url, string.IsNullOrEmpty(stream.Username) ? "none" : stream.Username, ResolutionOf(stream.Url));
-				}
-			}
-			else
-			{
-				this.LogInformation("Blanking the decoder output");
+				var error = "stream numbers are 1 to " + MaxStreams;
+				this.LogWarning("Stream {number} cannot be used: {error}", number, error);
+				SetError(-3, string.Format("Stream {0}: {1}", number, error));
+				return;
 			}
 
-			var result = client.SetViewConfiguration(stream);
+			var requested = (int[])selectedStreams.Clone();
+			requested[pane] = number;
+
+			ApplyPanes(requested);
+		}
+
+		// sends the layout for the streams asked for in each pane. A pane that is 0, hidden by privacy or cannot be built is left out
+		private void ApplyPanes(int[] requested)
+		{
+			var panes = new AxisD1110Pane[PaneCount];
+			string buildError = null;
+
+			for (var pane = 0; pane < PaneCount; pane++)
+			{
+				var number = requested[pane];
+				var camera = CameraOf(number);
+
+				panes[pane] = AxisD1110Layout.Resolve(number, camera != null && camera.PrivacyHidesVideo, BuildStream);
+
+				switch (panes[pane].Status)
+				{
+					case AxisD1110PaneStatus.HiddenByPrivacy:
+						this.LogInformation("Pane {pane}: stream {number} ({name}) is hidden: camera {key} is in privacy. Leaving it out",
+							pane + 1, number, StreamName(number), streams[number].CameraKey);
+						break;
+
+					case AxisD1110PaneStatus.Unavailable:
+						this.LogWarning("Stream {number} cannot be used: {error}", number, panes[pane].Error);
+						if (buildError == null) buildError = string.Format("Stream {0}: {1}", number, panes[pane].Error);
+						break;
+
+					case AxisD1110PaneStatus.Shown:
+						var stream = panes[pane].Stream;
+						this.LogInformation("Pane {pane}: stream {number} {name}: {url} login={login} resolution={resolution}",
+							pane + 1, number, StreamName(number), stream.Url, string.IsNullOrEmpty(stream.Username) ? "none" : stream.Username, ResolutionOf(stream.Url));
+						break;
+				}
+			}
+
+			var visible = AxisD1110Layout.Visible(panes);
+			var layout = LayoutName(visible.Count);
+
+			this.LogInformation("Sending streams {first} and {second} to the decoder: {layout}", requested[0], requested[1], layout);
+
+			var result = client.SetViewConfiguration(visible);
 			RecordResult(result);
 
 			if (!result.Success)
 			{
-				this.LogWarning("Select stream {number} failed: {code} {message}", number, result.ErrorCode, result.ErrorMessage);
+				this.LogWarning("Select streams {first} and {second} failed: {code} {message}", requested[0], requested[1], result.ErrorCode, result.ErrorMessage);
 				return;
 			}
 
-			this.LogInformation("Stream {number} ({name}) applied. Decoder configurationId={id}. Decoder reported error {code} {message}",
-				number, StreamName(number), result.ConfigurationId, result.ErrorCode, result.ErrorMessage);
+			// a stream that could not be built is reported, unless the decoder reported an error of its own
+			if (buildError != null && lastErrorCode == 0) SetError(-3, buildError);
+
+			this.LogInformation("Streams {first} ({firstName}) and {second} ({secondName}) applied, {layout}. Decoder configurationId={id}. Decoder reported error {code} {message}",
+				requested[0], StreamName(requested[0]), requested[1], StreamName(requested[1]), layout, result.ConfigurationId, result.ErrorCode, result.ErrorMessage);
 
 			selectionMade = true;
-			blankedByPrivacy = hiddenByPrivacy;
-			selectedStream = number;
+			for (var pane = 0; pane < PaneCount; pane++)
+			{
+				selectedStreams[pane] = requested[pane];
+				paneBlankedByPrivacy[pane] = panes[pane].Status == AxisD1110PaneStatus.HiddenByPrivacy;
+			}
+
 			configurationId = result.ConfigurationId ?? string.Empty;
 			SetOnline(true);
 			SelectedStreamFeedback.FireUpdate();
+			SelectedStream2Feedback.FireUpdate();
 			SelectedStreamNameFeedback.FireUpdate();
 			ConfigurationIdFeedback.FireUpdate();
+		}
+
+		private bool BuildStream(int number, out AxisD1110StreamConfig stream, out string error)
+		{
+			AxisD1110StreamConfig configured;
+			streams.TryGetValue(number, out configured);
+
+			string bridgeUrl;
+			lock (bridgeUrls)
+			{
+				bridgeUrls.TryGetValue(number, out bridgeUrl);
+			}
+
+			return AxisD1110StreamBuilder.TryBuild(config, configured, bridgeUrl, CameraOf(number), out stream, out error);
+		}
+
+		private static string LayoutName(int visibleStreams)
+		{
+			switch (visibleStreams)
+			{
+				case 0: return "blank";
+				case 1: return "full screen";
+				default: return "side by side";
+			}
 		}
 
 		private void ProcessPoll()
@@ -474,20 +576,27 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 
 			var newId = result.ConfigurationId ?? string.Empty;
 
-			if (configurationId.Length > 0 && newId != configurationId && selectedStream != 0)
+			if (configurationId.Length > 0 && newId != configurationId && (selectedStreams[0] != 0 || selectedStreams[1] != 0))
 			{
-				this.LogWarning("Decoder configuration changed outside this plugin ({old} to {new}). Selected stream is now unknown", configurationId, newId);
-				selectedStream = 0;
+				this.LogWarning("Decoder configuration changed outside this plugin ({old} to {new}). Selected streams are now unknown", configurationId, newId);
+				for (var pane = 0; pane < PaneCount; pane++)
+				{
+					selectedStreams[pane] = 0;
+					paneBlankedByPrivacy[pane] = false;
+				}
+
 				SelectedStreamFeedback.FireUpdate();
+				SelectedStream2Feedback.FireUpdate();
 				SelectedStreamNameFeedback.FireUpdate();
 			}
 
 			configurationId = newId;
 			ConfigurationIdFeedback.FireUpdate();
 
+			// the default stream goes in the first pane
 			if (!wasOnline && !selectionMade && config.DefaultStream > 0)
 			{
-				ProcessSelect(config.DefaultStream);
+				ProcessSelect(0, config.DefaultStream);
 			}
 		}
 
@@ -590,17 +699,19 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 			trilist.SetString(joinMap.DeviceName.JoinNumber, Name);
 
 			trilist.SetUShortSigAction(joinMap.SelectStream.JoinNumber, OnSelectJoin);
+			trilist.SetUShortSigAction(joinMap.SelectStream2.JoinNumber, OnSelect2Join);
 			trilist.SetSigTrueAction(joinMap.Clear.JoinNumber, Clear);
 			trilist.SetSigTrueAction(joinMap.Refresh.JoinNumber, Poll);
 
-			this.LogInformation("Linked ({layout} layout): select stream is analog join {select}, online is digital join {online}",
-				indexed ? "indexed" : "contiguous", joinMap.SelectStream.JoinNumber, joinMap.IsOnline.JoinNumber);
+			this.LogInformation("Linked ({layout} layout): select stream is analog join {select}, second stream is analog join {select2}, online is digital join {online}",
+				indexed ? "indexed" : "contiguous", joinMap.SelectStream.JoinNumber, joinMap.SelectStream2.JoinNumber, joinMap.IsOnline.JoinNumber);
 
 			if (config.IsBridgeSource && !indexed)
 			{
-				this.LogInformation("Stream URLs come from the bridge, serial joins {start} to {end}", joinMap.StreamUrls.JoinNumber, joinMap.StreamUrls.JoinNumber + MaxStreams - 1);
+				// only streams 1 to 16 have URL joins
+				this.LogInformation("Stream URLs come from the bridge, serial joins {start} to {end}", joinMap.StreamUrls.JoinNumber, joinMap.StreamUrls.JoinNumber + MaxBridgeStreams - 1);
 
-				for (var i = 0; i < MaxStreams; i++)
+				for (var i = 0; i < MaxBridgeStreams; i++)
 				{
 					var number = i + 1;
 					trilist.SetStringSigAction(joinMap.StreamUrls.JoinNumber + (uint)i, url => SetBridgeStreamUrl(number, url));
@@ -609,6 +720,7 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 
 			OnlineFeedback.LinkInputSig(trilist.BooleanInput[joinMap.IsOnline.JoinNumber]);
 			SelectedStreamFeedback.LinkInputSig(trilist.UShortInput[joinMap.SelectStream.JoinNumber]);
+			SelectedStream2Feedback.LinkInputSig(trilist.UShortInput[joinMap.SelectStream2.JoinNumber]);
 			LastErrorCodeFeedback.LinkInputSig(trilist.UShortInput[joinMap.LastErrorCode.JoinNumber]);
 			SelectedStreamNameFeedback.LinkInputSig(trilist.StringInput[joinMap.SelectedStreamName.JoinNumber]);
 			LastErrorFeedback.LinkInputSig(trilist.StringInput[joinMap.LastError.JoinNumber]);
@@ -628,8 +740,8 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 		{
 			trilist.SetString(joinMap.DeviceName.JoinNumber, Name);
 
-			// the stream names have no joins in the indexed layout
-			for (var number = 1; number <= MaxStreams && !indexed; number++)
+			// the stream names have no joins in the indexed layout, and only streams 1 to 16 have one in the contiguous layout
+			for (var number = 1; number <= MaxBridgeStreams && !indexed; number++)
 			{
 				AxisD1110StreamConfig configured;
 				streams.TryGetValue(number, out configured);
@@ -638,6 +750,7 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 
 			OnlineFeedback.FireUpdate();
 			SelectedStreamFeedback.FireUpdate();
+			SelectedStream2Feedback.FireUpdate();
 			SelectedStreamNameFeedback.FireUpdate();
 			LastErrorCodeFeedback.FireUpdate();
 			LastErrorFeedback.FireUpdate();

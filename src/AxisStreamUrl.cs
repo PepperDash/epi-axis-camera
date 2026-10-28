@@ -254,6 +254,22 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 
 			return AxisPrivacyAction.None;
 		}
+
+		/// <summary>
+		/// True when a decoder showing several panes has to send its layout again, because privacy changed
+		/// on the camera of at least one pane. Each pane is planned on its own with <see cref="Plan"/>
+		/// </summary>
+		/// <param name="paneCameraHidesVideo">Per pane: the camera of the pane's stream has its video hidden by privacy</param>
+		/// <param name="paneBlankedByPrivacy">Per pane: the pane is currently left out because of privacy</param>
+		public static bool PanesNeedApply(IList<bool> paneCameraHidesVideo, IList<bool> paneBlankedByPrivacy)
+		{
+			for (var pane = 0; pane < paneCameraHidesVideo.Count && pane < paneBlankedByPrivacy.Count; pane++)
+			{
+				if (Plan(paneCameraHidesVideo[pane], paneBlankedByPrivacy[pane]) != AxisPrivacyAction.None) return true;
+			}
+
+			return false;
+		}
 	}
 
 	/// <summary>
@@ -261,6 +277,31 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 	/// </summary>
 	public static class AxisD1110Select
 	{
+		/// <summary>
+		/// Highest stream number a decoder can be configured with or told to show
+		/// </summary>
+		public const int MaxStreams = 64;
+
+		/// <summary>
+		/// True when the number is a stream number (1 to <see cref="MaxStreams"/>)
+		/// </summary>
+		/// <param name="number">Stream number</param>
+		public static bool IsStreamNumber(int number)
+		{
+			return number >= 1 && number <= MaxStreams;
+		}
+
+		/// <summary>
+		/// Reads a key of the streams configuration
+		/// </summary>
+		/// <param name="key">Key from the config, for example "33"</param>
+		/// <param name="number">The stream number when this returns true</param>
+		/// <returns>False when the key is not a number from 1 to <see cref="MaxStreams"/></returns>
+		public static bool TryParseStreamKey(string key, out int number)
+		{
+			return int.TryParse(key, out number) && IsStreamNumber(number);
+		}
+
 		/// <summary>
 		/// True when the value should select a stream
 		/// </summary>
@@ -272,6 +313,131 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 			if (!onlyConfiguredStreams) return true;
 
 			return value >= 1 && isConfigured(value);
+		}
+	}
+
+	/// <summary>
+	/// What one decoder pane ends up showing
+	/// </summary>
+	public enum AxisD1110PaneStatus
+	{
+		/// <summary>
+		/// No stream asked for (0)
+		/// </summary>
+		Empty,
+
+		/// <summary>
+		/// The stream's camera is in privacy, so the pane is left out
+		/// </summary>
+		HiddenByPrivacy,
+
+		/// <summary>
+		/// The stream cannot be built (not configured, no URL, camera missing), so the pane is left out
+		/// </summary>
+		Unavailable,
+
+		/// <summary>
+		/// The stream is shown
+		/// </summary>
+		Shown
+	}
+
+	/// <summary>
+	/// One decoder pane: the stream asked for and what came of it
+	/// </summary>
+	public sealed class AxisD1110Pane
+	{
+		/// <summary>
+		/// Stream number asked for. 0 means none
+		/// </summary>
+		public int Number { get; set; }
+
+		/// <summary>
+		/// What the pane shows
+		/// </summary>
+		public AxisD1110PaneStatus Status { get; set; }
+
+		/// <summary>
+		/// The stream to send when Status is Shown
+		/// </summary>
+		public AxisD1110StreamConfig Stream { get; set; }
+
+		/// <summary>
+		/// Why the stream cannot be built when Status is Unavailable
+		/// </summary>
+		public string Error { get; set; }
+	}
+
+	/// <summary>
+	/// Builds the stream for a stream number
+	/// </summary>
+	/// <param name="number">Stream number</param>
+	/// <param name="stream">The stream to send when this returns true</param>
+	/// <param name="error">Why no stream could be built when this returns false</param>
+	public delegate bool AxisD1110PaneBuilder(int number, out AxisD1110StreamConfig stream, out string error);
+
+	/// <summary>
+	/// Rules for the decoder layout: up to two panes, like a quad multiviewer following two touch panel video windows.
+	/// A pane that is 0, hidden by privacy or cannot be built is left out and the other pane is still shown.
+	/// No pane left blanks the output, one is shown full screen, two are shown side by side
+	/// </summary>
+	public static class AxisD1110Layout
+	{
+		/// <summary>
+		/// Number of panes the decoder is driven with
+		/// </summary>
+		public const int PaneCount = 2;
+
+		/// <summary>
+		/// Decides what one pane shows
+		/// </summary>
+		/// <param name="number">Stream number asked for, 0 for none</param>
+		/// <param name="hiddenByPrivacy">The stream's camera is in privacy</param>
+		/// <param name="build">Builds the stream. Not called for 0 or a stream hidden by privacy</param>
+		public static AxisD1110Pane Resolve(int number, bool hiddenByPrivacy, AxisD1110PaneBuilder build)
+		{
+			var pane = new AxisD1110Pane { Number = number };
+
+			if (number == 0)
+			{
+				pane.Status = AxisD1110PaneStatus.Empty;
+				return pane;
+			}
+
+			if (hiddenByPrivacy)
+			{
+				pane.Status = AxisD1110PaneStatus.HiddenByPrivacy;
+				return pane;
+			}
+
+			AxisD1110StreamConfig stream;
+			string error;
+			if (build(number, out stream, out error) && stream != null)
+			{
+				pane.Status = AxisD1110PaneStatus.Shown;
+				pane.Stream = stream;
+				return pane;
+			}
+
+			pane.Status = AxisD1110PaneStatus.Unavailable;
+			pane.Error = string.IsNullOrEmpty(error) ? "the stream cannot be built" : error;
+			return pane;
+		}
+
+		/// <summary>
+		/// The streams to send to the decoder, in pane order, leaving out every pane that shows nothing
+		/// </summary>
+		/// <param name="panes">The resolved panes</param>
+		public static List<AxisD1110StreamConfig> Visible(IEnumerable<AxisD1110Pane> panes)
+		{
+			var visible = new List<AxisD1110StreamConfig>();
+
+			foreach (var pane in panes)
+			{
+				if (pane != null && pane.Status == AxisD1110PaneStatus.Shown) visible.Add(pane.Stream);
+			}
+
+			return visible;
 		}
 	}
 

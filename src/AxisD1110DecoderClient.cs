@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Newtonsoft.Json.Linq;
 
 namespace PepperDash.Essentials.Plugins.Camera.Axis
@@ -71,54 +72,98 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 		}
 
 		/// <summary>
-		/// Builds the params object for setViewConfiguration: one full screen pane, one stream, one view
+		/// Shows up to two streams: none blanks the output, one is full screen, two are side by side
+		/// </summary>
+		/// <param name="streams">Streams to show, in pane order. Null entries are left out</param>
+		public AxisD1110Result SetViewConfiguration(IList<AxisD1110StreamConfig> streams)
+		{
+			return Send("setViewConfiguration", BuildViewConfiguration(streams));
+		}
+
+		/// <summary>
+		/// Builds the params object for setViewConfiguration for one stream: one full screen pane, one stream, one view.
+		/// A null stream builds an empty configuration
 		/// </summary>
 		public static JObject BuildViewConfiguration(AxisD1110StreamConfig stream)
 		{
-			if (stream == null)
+			return BuildViewConfiguration(stream == null ? new AxisD1110StreamConfig[0] : new[] { stream });
+		}
+
+		/// <summary>
+		/// Builds the params object for setViewConfiguration. No stream builds an empty configuration (blank output).
+		/// One stream is one full screen pane. Two streams are two 16:9 panes side by side, centred vertically
+		/// (left half and right half, top 0.25 to bottom 0.75). Always one view, shown continuously
+		/// </summary>
+		/// <param name="streams">Streams to show, in pane order (at most two). Null entries are left out</param>
+		public static JObject BuildViewConfiguration(IList<AxisD1110StreamConfig> streams)
+		{
+			var shown = new List<AxisD1110StreamConfig>();
+			if (streams != null)
 			{
-				return new JObject
+				foreach (var stream in streams)
 				{
-					{ "panes", new JArray() },
-					{ "streams", new JArray() },
-					{ "views", new JArray() }
-				};
+					if (stream != null) shown.Add(stream);
+				}
+			}
+
+			if (shown.Count > AxisD1110Layout.PaneCount)
+			{
+				throw new ArgumentException("At most " + AxisD1110Layout.PaneCount + " streams can be shown", "streams");
+			}
+
+			var panes = new JArray();
+			var streamArray = new JArray();
+			var segments = new JArray();
+
+			for (var i = 0; i < shown.Count; i++)
+			{
+				var stream = shown[i];
+
+				if (shown.Count == 1)
+				{
+					panes.Add(Pane(i, 0.0, 0.0, 1.0, 1.0));
+				}
+				else
+				{
+					// half the width and half the height keeps each pane 16:9 on a 16:9 output
+					panes.Add(Pane(i, i * 0.5, 0.25, i * 0.5 + 0.5, 0.75));
+				}
+
+				streamArray.Add(new JObject
+				{
+					{ "streamId", i },
+					{ "url", stream.Url },
+					{ "videoCodec", string.IsNullOrEmpty(stream.VideoCodec) ? "H264" : stream.VideoCodec },
+					{ "audioCodec", stream.AudioCodec ?? string.Empty },
+					{ "username", stream.Username ?? string.Empty },
+					{ "password", stream.Password ?? string.Empty }
+				});
+
+				segments.Add(new JObject { { "stream", i }, { "pane", i } });
+			}
+
+			var views = new JArray();
+			if (shown.Count > 0)
+			{
+				views.Add(new JObject
+				{
+					{ "viewId", 0 },
+					{ "duration", 0 },
+					{ "segments", segments }
+				});
 			}
 
 			return new JObject
 			{
-				{
-					"panes", new JArray
-					{
-						new JObject { { "paneId", 0 }, { "left", 0.0 }, { "top", 0.0 }, { "right", 1.0 }, { "bottom", 1.0 } }
-					}
-				},
-				{
-					"streams", new JArray
-					{
-						new JObject
-						{
-							{ "streamId", 0 },
-							{ "url", stream.Url },
-							{ "videoCodec", string.IsNullOrEmpty(stream.VideoCodec) ? "H264" : stream.VideoCodec },
-							{ "audioCodec", stream.AudioCodec ?? string.Empty },
-							{ "username", stream.Username ?? string.Empty },
-							{ "password", stream.Password ?? string.Empty }
-						}
-					}
-				},
-				{
-					"views", new JArray
-					{
-						new JObject
-						{
-							{ "viewId", 0 },
-							{ "duration", 0 },
-							{ "segments", new JArray { new JObject { { "stream", 0 }, { "pane", 0 } } } }
-						}
-					}
-				}
+				{ "panes", panes },
+				{ "streams", streamArray },
+				{ "views", views }
 			};
+		}
+
+		private static JObject Pane(int id, double left, double top, double right, double bottom)
+		{
+			return new JObject { { "paneId", id }, { "left", left }, { "top", top }, { "right", right }, { "bottom", bottom } };
 		}
 
 		/// <summary>

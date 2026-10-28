@@ -60,4 +60,20 @@ public class PrivacyTests
 
 		AxisPrivacy.Plan(false, blanked).Should().Be(AxisPrivacyAction.None);
 	}
+
+	[Theory]
+	// nothing changed in either pane
+	[InlineData(false, false, false, false, false)]
+	[InlineData(true, true, false, false, false)]
+	[InlineData(true, true, true, true, false)]
+	// the camera of one pane went into privacy: that pane is left out
+	[InlineData(true, false, false, false, true)]
+	[InlineData(false, false, true, false, true)]
+	// privacy ended on one pane: it comes back
+	[InlineData(false, true, false, false, true)]
+	[InlineData(true, true, false, true, true)]
+	public void PanesNeedApply_WhenEitherPaneChanges(bool hides1, bool blanked1, bool hides2, bool blanked2, bool expected)
+	{
+		AxisPrivacy.PanesNeedApply(new[] { hides1, hides2 }, new[] { blanked1, blanked2 }).Should().Be(expected);
+	}
 }

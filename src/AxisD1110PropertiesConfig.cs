@@ -51,7 +51,7 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 		public int DecoderIndex { get; set; }
 
 		/// <summary>
-		/// When true, the select stream join only acts on numbers that are configured streams. Any other value, including 0, is
+		/// When true, the select stream joins (both panes) only act on numbers that are configured streams. Any other value, including 0, is
 		/// ignored (use the clear join to blank the output). Use it when the join is driven by something that also carries other
 		/// numbers, such as a display's selected source, where the camera buttons are sources 1 to 3 and everything else is not a stream
 		/// </summary>
@@ -65,7 +65,7 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 		public long PollTimeMs { get; set; }
 
 		/// <summary>
-		/// Stream selected when the decoder first comes online. 0 (default) leaves the decoder as it is
+		/// Stream selected (first pane) when the decoder first comes online. 0 (default) leaves the decoder as it is
 		/// </summary>
 		[JsonProperty("defaultStream")]
 		public int DefaultStream { get; set; }
@@ -113,7 +113,7 @@ namespace PepperDash.Essentials.Plugins.Camera.Axis
 		public string StreamPassword { get; set; }
 
 		/// <summary>
-		/// Selectable streams, keyed by the stream number SIMPL sends (1 to 16). With streamSource bridge
+		/// Selectable streams, keyed by the stream number SIMPL sends (1 to 64). With streamSource bridge
 		/// the entries are optional and only supply names and per stream settings, the URL comes from the bridge
 		/// </summary>
 		[JsonProperty("streams")]

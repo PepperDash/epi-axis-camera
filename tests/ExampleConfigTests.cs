@@ -73,7 +73,7 @@ public class ExampleConfigTests
 					config.Host.Should().NotBeNullOrEmpty();
 					config.Username.Should().NotBeNullOrEmpty();
 					config.Streams.Should().NotBeEmpty();
-					config.Streams.Keys.Should().OnlyContain(k => int.Parse(k) >= 1 && int.Parse(k) <= 16);
+					config.Streams.Keys.Should().OnlyContain(k => int.Parse(k) >= 1 && int.Parse(k) <= AxisD1110Select.MaxStreams);
 
 					foreach (var stream in config.Streams.Values)
 					{

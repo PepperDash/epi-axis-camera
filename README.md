@@ -18,7 +18,7 @@ Controls Axis network devices from PepperDash Essentials over VAPIX. Two device 
 | Type | Device | What it does |
 |---|---|---|
 | `axisCamera` | Axis PTZ camera, written for the **M5526-E** | Pan, tilt, zoom, focus, iris, home, presets (recall and save), restart, and privacy that hides the camera's video everywhere |
-| `axisD1110` | Axis D1110 video decoder | Tells the decoder which camera stream to show on its HDMI output |
+| `axisD1110` | Axis D1110 video decoder | Tells the decoder which camera stream to show on its HDMI output, or two side by side |
 
 They work together. A decoder stream can be a camera (`"cameraKey": "cam-33"`), so each camera's address and login is written once and the decoder builds the RTSP URL from it.
 
@@ -86,7 +86,7 @@ Axis announces a discontinuation for this model on its [support page](https://ww
 Privacy hides a camera's video everywhere, in addition to the camera moving to its privacy preset. Hold the Privacy join high (or call `SetPrivacy` with `true`) and, with `privacyClearsStream` (the default):
 
 * **The preview URL sent to SIMPL is cleared**, so touch panel previews of this camera stop.
-* **Every `axisD1110` decoder showing this camera is blanked.** The decoder remembers the stream it was asked to show, and shows it again when privacy ends. Selecting a stream whose camera is in privacy keeps the output blank until privacy ends.
+* **Every `axisD1110` decoder showing this camera is blanked.** The decoder remembers the stream it was asked to show, and shows it again when privacy ends. Selecting a stream whose camera is in privacy keeps the output blank until privacy ends. With two streams side by side only the pane of the camera in privacy is left out: the other stream is shown full screen until privacy ends, then the two are side by side again.
 
 Moving the camera to its privacy position is not done here. Whatever recalls the preset (for example a control program pressing the preset joins) keeps doing it, so the join and the preset recall do not conflict and the order they arrive in does not matter. The camera's controls are not blocked by this plugin.
 
@@ -148,29 +148,42 @@ VAPIX answers a PTZ command with `204 No Content` when it worked. A failed comma
 
 ## What you can control
 
-The D1110 Decoder API has one job: it tells the decoder which streams to decode and where to draw them. The plugin uses it to show one stream full screen.
+The D1110 Decoder API has one job: it tells the decoder which streams to decode and where to draw them. The plugin uses it to show one stream full screen, or two side by side, like a quad multiviewer following two touch panel video windows.
 
 | You want to | How | Notes |
 |---|---|---|
-| Show a camera | Send the stream number (1 to 16) to the analog join, or call `SelectStream` | The decoder connects to the camera and replaces what it was showing |
-| Show a camera by name | `SelectStreamByName` (DEVJSON) | |
-| Blank the output | Pulse the Clear digital join, send 0 to the analog join, or call `Clear` | Sends an empty view configuration. Not yet confirmed on a real D1110 that this blanks the HDMI output |
-| Start on a stream | `defaultStream` in the config | Applied once, the first time the decoder comes online. 0 leaves the decoder as it is |
+| Show a camera | Send the stream number (1 to 64) to the SelectStream analog join, or call `SelectStream` | The decoder connects to the camera and replaces what it was showing |
+| Show two cameras side by side | Send the second stream number to the SelectStream2 analog join, or call `SelectStream2` | See [Side by side](#side-by-side). 0 on SelectStream2 goes back to the first stream full screen |
+| Show a camera by name | `SelectStreamByName` (DEVJSON) | First pane |
+| Blank the output | Pulse the Clear digital join, send 0 to both select joins, or call `Clear` | Clear empties both panes. Sends an empty view configuration. Not yet confirmed on a real D1110 that this blanks the HDMI output |
+| Start on a stream | `defaultStream` in the config | First pane. Applied once, the first time the decoder comes online. 0 leaves the decoder as it is |
 | Check it is reachable | Online feedback, `Poll`, the Refresh digital join | A `getViewConfiguration` request every `pollTimeMs` |
 | Probe the decoder | `SendRequest` (DEVJSON) with any Decoder API method | For example `getCapabilities`. The answer is logged |
-| Hide a camera on privacy | Nothing to do: it follows the camera | A decoder showing a camera blanks when that camera goes into privacy and shows the stream again afterwards. Only streams that name a camera (`cameraKey`) do this. See [Privacy](#privacy) |
+| Hide a camera on privacy | Nothing to do: it follows the camera | A decoder pane showing a camera is left out when that camera goes into privacy and comes back afterwards. Only streams that name a camera (`cameraKey`) do this. See [Privacy](#privacy) |
+
+### Side by side
+
+The decoder follows two select joins, SelectStream (first pane) and SelectStream2 (second pane). A change on either sends both again. Each time, a pane is left out when it is 0, when its camera is in privacy, or when its stream cannot be used (not configured, no URL yet, camera not found: a warning is logged and the error text set, and the other pane is still shown). Then:
+
+| Streams left | Decoder shows |
+|---|---|
+| None | Blank (empty view configuration) |
+| One | That stream full screen, exactly as with a single stream |
+| Two | Two 16:9 panes side by side, centred vertically: the first stream on the left (left 0.0, top 0.25, right 0.5, bottom 0.75) and the second on the right (left 0.5, top 0.25, right 1.0, bottom 0.75) |
+
+Stream numbers go from 1 to 64, so they can be the camera numbers. `selectOnlyConfiguredStreams` filters both joins the same way.
 
 ### What you get back
 
 * **Online**: the decoder answered the last request.
-* **Selected stream** (number and name): the last stream the plugin sent. The decoder does not report which stream it is showing, so this is what the plugin asked for, not a reading from the decoder.
-* **Configuration id**: the decoder view configuration id. If it changes without the plugin causing it (someone used the decoder's web page), the selected stream is cleared to 0 and a warning is logged.
+* **Selected stream** (number and name) and **second stream** (number): the last streams the plugin sent for each pane. The decoder does not report which streams it is showing, so this is what the plugin asked for, not a reading from the decoder. A stream that could not be used is still reported here (and in the error text), even though its pane is left out.
+* **Configuration id**: the decoder view configuration id. If it changes without the plugin causing it (someone used the decoder's web page), both selected streams are cleared to 0 and a warning is logged.
 * **Last error code and message**: the first error the decoder returned, or an HTTP or connection failure. A stream that fails to connect (code 400) is reported here even though the configuration was applied.
 
 ### What it does not do
 
 * **PTZ.** Use the `axisCamera` device for that.
-* **Split screens and tours.** The Decoder API can show several panes and rotate through views. The plugin always sends one full screen pane showing one stream.
+* **Other split screens and tours.** The Decoder API can show more panes and rotate through views. The plugin sends one full screen stream or two side by side, nothing else.
 * **Audio control.** `audioCodec` is passed to the decoder with each stream. There is no mute or volume.
 * **Decoder settings.** Network settings, firmware, users and the like.
 
@@ -182,7 +195,7 @@ Each stream is an RTSP URL, supplied one of three ways:
 
 **A URL in the configuration (`"streamSource": "config"`, the default).** Write the `url` in each entry of `streams`.
 
-**A URL from SIMPL (`"streamSource": "bridge"`).** SIMPL sends the URL of each stream on the stream URL serial joins (31 to 46, from `joinStart`). The `streams` entries are optional and only give names and per stream settings.
+**A URL from SIMPL (`"streamSource": "bridge"`).** SIMPL sends the URL of each stream on the stream URL serial joins (31 to 46, from `joinStart`). Only streams 1 to 16 have a URL join. The `streams` entries are optional and only give names and per stream settings.
 
 Whichever way the URL arrives, the plugin takes it apart before it sends anything to the decoder:
 
@@ -195,7 +208,7 @@ resolution    1920x1080
 decoder gets  rtsp://192.168.10.240/axis-media/media.amp?resolution=1920x1080   login streamUsername / streamPassword, if set
 ```
 
-If a stream's URL changes while it is on screen, the plugin sends the new one to the decoder. Selecting a stream that has no URL yet logs a warning and sets the error text.
+If a stream's URL changes while it is selected in either pane, the plugin sends the layout to the decoder again. Selecting a stream that has no URL yet logs a warning and sets the error text.
 
 ## Configuration
 
@@ -225,15 +238,15 @@ If a stream's URL changes while it is on screen, the plugin sends the new one to
 | `port`, `useHttps`, `ignoreCertificateErrors`, `authMode`, `requestTimeoutMs` | | As for the camera |
 | `username`, `password` | | Decoder login, Operator role or higher |
 | `pollTimeMs` | 30000 | Poll with `getViewConfiguration`. A negative value polls once at startup only |
-| `defaultStream` | 0 | Stream selected the first time the decoder comes online. 0 leaves the decoder as it is |
+| `defaultStream` | 0 | Stream selected (first pane) the first time the decoder comes online. 0 leaves the decoder as it is |
 | `streamSource` | `config` | `config` or `bridge`, for streams that have no `cameraKey` |
 | `resolution` | | Resolution to request, for example `1920x1080`. Empty leaves the URL as received |
 | `cameraStreamPath` | `/axis-media/media.amp` | Path of the stream on a camera, for streams with a `cameraKey` |
 | `streamUsername`, `streamPassword` | | Camera login when nothing else supplies one |
 | `joinLayout` | `contiguous` | `indexed`: up to 8 decoders share one small EISC, see [Indexed layout (decoders)](#indexed-layout-decoders-on-one-small-eisc) |
 | `decoderIndex` | | Which decoder this is (1 to 8) with the indexed layout |
-| `selectOnlyConfiguredStreams` | false | When true, the select stream join only acts on numbers that are configured streams, and ignores everything else including 0 (use the clear join to blank). Use it when the join is driven by a display's selected source: the camera buttons are sources 1 to 3 and the other sources are not streams |
-| `streams` | | Keyed 1 to 16. Each has `cameraKey` or `url`, optional `name`, `resolution`, `videoCodec` (H264 default, MJPEG, MPEG4), `audioCodec` (default none), and `username` / `password` which override any other login |
+| `selectOnlyConfiguredStreams` | false | When true, the select stream joins (both panes) only act on numbers that are configured streams, and ignores everything else including 0 (use the clear join to blank). Use it when the join is driven by a display's selected source: the camera buttons are sources 1 to 3 and the other sources are not streams |
+| `streams` | | Keyed 1 to 64 (for example the camera numbers). Only 1 to 16 have stream name and stream URL joins. Each has `cameraKey` or `url`, optional `name`, `resolution`, `videoCodec` (H264 default, MJPEG, MPEG4), `audioCodec` (default none), and `username` / `password` which override any other login |
 
 The stream number is what SIMPL sends, so keep the same numbers on every decoder that serves the same kind of camera (for example 1 = Left PTZ, 2 = Right PTZ, 3 = Monopod).
 
@@ -315,14 +328,15 @@ The layout is regular: every camera's block is exactly 30 digital joins after th
 | 1 | Digital | To SIMPL | Decoder online |
 | 2 | Digital | From SIMPL | Pulse to blank the output |
 | 3 | Digital | From SIMPL | Pulse to poll now |
-| 1 | Analog | To/From SIMPL | Stream to show (1 to 16, 0 blanks) and selected stream feedback |
+| 1 | Analog | To/From SIMPL | Stream to show (1 to 64, 0 blanks) and selected stream feedback |
 | 2 | Analog | To SIMPL | Last Decoder API error code (0 none) |
+| 3 | Analog | To/From SIMPL | Second stream, shown side by side with the first (0 = none), and its feedback |
 | 1 | Serial | To SIMPL | Device name |
 | 2 | Serial | To SIMPL | Selected stream name |
 | 3 | Serial | To SIMPL | Last error message |
 | 4 | Serial | To SIMPL | Decoder configuration id |
-| 11 to 26 | Serial | To SIMPL | Stream names, in stream number order |
-| 31 to 46 | Serial | From SIMPL | Stream RTSP URLs. Used when `streamSource` is `bridge` |
+| 11 to 26 | Serial | To SIMPL | Stream names of streams 1 to 16, in stream number order |
+| 31 to 46 | Serial | From SIMPL | Stream RTSP URLs of streams 1 to 16. Used when `streamSource` is `bridge` |
 
 ### Indexed layout: decoders on one small EISC
 
@@ -333,8 +347,9 @@ With `"joinLayout": "indexed"` and a `decoderIndex` from 1 to 8, up to eight dec
 | `n` | Digital | To SIMPL | Decoder online |
 | `8 + n` | Digital | From SIMPL | Pulse to blank the output |
 | `16 + n` | Digital | From SIMPL | Pulse to poll now |
-| `n` | Analog | To/From SIMPL | Stream to show (1 to 16, 0 blanks) and selected stream feedback |
+| `n` | Analog | To/From SIMPL | Stream to show (1 to 64, 0 blanks) and selected stream feedback |
 | `8 + n` | Analog | To SIMPL | Last Decoder API error code |
+| `16 + n` | Analog | To/From SIMPL | Second stream, shown side by side with the first (0 = none), and its feedback |
 | `n` | Serial | To SIMPL | Device name |
 | `8 + n` | Serial | To SIMPL | Selected stream name |
 | `16 + n` | Serial | To SIMPL | Last error message |
@@ -377,6 +392,7 @@ DEVJSON commands (`devjson:1 <json>`) that call a device directly:
 {"deviceKey":"cam-left","methodName":"SendRequest","params":["/axis-cgi/com/ptz.cgi?info=1"]}
 {"deviceKey":"d1110-1","methodName":"PrintStatus","params":[]}
 {"deviceKey":"d1110-1","methodName":"SelectStream","params":[1]}
+{"deviceKey":"d1110-1","methodName":"SelectStream2","params":[2]}
 {"deviceKey":"d1110-1","methodName":"SelectStreamByName","params":["Left PTZ"]}
 {"deviceKey":"d1110-1","methodName":"Clear","params":[]}
 {"deviceKey":"d1110-1","methodName":"SendRequest","params":["getCapabilities",""]}
@@ -389,8 +405,8 @@ Unit tests (`tests/`) cover the VAPIX requests and answers, the join layouts, th
 ## How it works
 
 * **Camera:** continuous moves start when a join goes high and stop when it goes low. Requests are queued and sent one at a time in the order they were made, so a stop never overtakes the move it belongs to.
-* **Privacy:** a camera raises an event when privacy hides or shows its video. Every decoder that has a stream naming that camera listens for it, and re-selects its stream: the output is blanked while the camera is in privacy and connects again when it is not.
-* **Decoder:** the Decoder API has no "select input" command. Selecting a stream sends a complete view configuration (one full screen pane showing one stream), which replaces what the decoder was showing. The decoder keeps its configuration across a restart. Commands are queued, so a poll never overlaps a select.
+* **Privacy:** a camera raises an event when privacy hides or shows its video. Every decoder that has a stream naming that camera listens for it, and if that camera is in either pane sends its layout again: the pane is left out while the camera is in privacy and connects again when it is not.
+* **Decoder:** the Decoder API has no "select input" command. Selecting a stream sends a complete view configuration (one full screen pane, or two side by side panes, one stream each), which replaces what the decoder was showing. The decoder keeps its configuration across a restart. Commands are queued, so a poll never overlaps a select.
 
 ## Upgrading from the 1.0.0-rc plugin
 
